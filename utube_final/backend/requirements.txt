@@ -1,0 +1,16 @@
+# Core API
+fastapi
+uvicorn[standard]
+
+# Machine Learning - Traditional
+scikit-learn
+pandas
+numpy
+
+# Machine Learning - Deep Learning
+
+
+# Database & External APIs
+firebase-admin
+google-api-python-client
+python-dotenv

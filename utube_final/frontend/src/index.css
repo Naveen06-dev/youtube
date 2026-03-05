@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+@theme {
+  --color-yt-red: #FF0000;
+  --color-yt-black: #0f0f0f;
+  --color-yt-grey: #272727;
+  --color-yt-light: #f1f1f1;
+
+  --shadow-yt-glow: 0 0 15px rgba(255, 0, 0, 0.4);
+  --shadow-yt-glow-hover: 0 0 25px rgba(255, 0, 0, 0.6);
+
+  --animate-glow: glow 2s ease-in-out infinite alternate;
+  --animate-float: float 6s ease-in-out infinite;
+
+  @keyframes glow {
+    0% {
+      box-shadow: 0 0 5px rgba(255, 0, 0, 0.2);
+    }
+
+    100% {
+      box-shadow: 0 0 20px rgba(255, 0, 0, 0.6);
+    }
+  }
+
+  @keyframes float {
+
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+
+    50% {
+      transform: translateY(-20px);
+    }
+  }
+}
+
+@layer base {
+  body {
+    @apply bg-yt-black text-white antialiased;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-yt-black;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-yt-grey rounded-full border-2 border-yt-black;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-white/5 backdrop-blur-xl border border-white/10 shadow-2xl;
+  }
+
+  .btn-primary {
+    @apply bg-yt-red hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg transition-all transform hover:scale-105 active:scale-95 shadow-yt-glow hover:shadow-yt-glow-hover;
+  }
+
+
+  .input-field {
+    @apply bg-white/5 border border-white/10 rounded-lg py-3 px-4 outline-none focus:border-yt-red/50 focus:ring-2 focus:ring-yt-red/20 transition-all text-white placeholder-white/40;
+  }
+}
