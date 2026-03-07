@@ -70,7 +70,27 @@ class SmartRankingEngine:
         elif intent == video_category:
             score += 200
 
-        # --- 3. PERSONALIZATION ---
+        # --- 3. PERSONALIZATION & HISTORY (CRITICAL) ---
+        # 3a. Liked Categories Boost
+        liked_cats = [c.lower() for c in self.user_profile.get("liked_categories", [])]
+        if video_category in liked_cats:
+            score += 2000 # Massive boost to ensure history relevance
+            
+        # 3b. Interest Overlap (if no query match)
+        # If the user is on 'Recommended' feed, we check overlap with history topics
+        interest_topics = self.user_profile.get("interest_topics", [])
+        has_interest_match = False
+        for topic in interest_topics:
+            if topic.lower() in title or topic.lower() in video.get('tags', '').lower():
+                score += 1500
+                has_interest_match = True
+        
+        # 3c. Strict Filtering: If user has history but this video matches NOTHING, penalize heavily
+        # This ensures the "ONLY relevant" requirement
+        if interest_topics or liked_cats:
+             if not has_interest_match and video_category not in liked_cats and processed_query == "recommended":
+                 score -= 5000 # Bury unrelated content
+
         # Subscribed channels boost
         subs = self.user_profile.get("subscribed_channels", [])
         if video.get("channelId") in subs or video.get("channelTitle") in subs:
@@ -79,28 +99,21 @@ class SmartRankingEngine:
         # Watch history penalty (reduce already watched)
         history = self.user_profile.get("watch_history", [])
         if video.get("id") in history:
-            score -= 600 # Strong reduction as per user requirement
+            score -= 800 # Stronger reduction to keep feed fresh
 
         # --- 4. ENGAGEMENT SIGNALS (Simulated if missing) ---
-        # Normally these come from the candidate video metadata
+        # Only add a small boost from engagement so it doesn't override history
         ctr = video.get("ctr", random.uniform(0.01, 0.15))
-        watch_time = video.get("avg_watch_time", random.randint(30, 600))
-        engagement_rate = video.get("engagement_rate", random.uniform(0.01, 0.05))
+        score += ctr * 500
         
-        score += ctr * 2000 # 5% CTR -> +100
-        score += (watch_time / 60) * 50 # 5 mins -> +250
-        score += engagement_rate * 5000 # 2% eng -> +100
-
         # --- 5. FRESHNESS ---
         try:
             pub_date_str = video.get("publishedAt", "")
             if pub_date_str:
                 pub_date = datetime.fromisoformat(pub_date_str.replace("Z", "+00:00"))
                 days_old = (datetime.now(pub_date.tzinfo) - pub_date).days
-                if days_old < 7:
-                    score += 300 # Recent boost
-                elif days_old < 30:
-                    score += 100
+                if days_old < 30:
+                    score += 200 # Recent boost
         except:
             pass
 

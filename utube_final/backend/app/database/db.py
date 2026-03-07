@@ -23,16 +23,19 @@ _comments = {}        # Stores video comments
 _saved_videos = {}    # Stores saved videos per user
 _last_search_terms = {} # Stores last search terms per user
 _playlists = {}       # Stores playlists per user: {user_id: {name: [video_ids]}}
+_query_results_cache = {} # {query: (timestamp, [videos])}
 
-# ============ YOUTUBE CLIENT ============
+_youtube_client = None
+
 def get_youtube_client():
-    """Initialize and return a fresh YouTube API client to avoid thread-safety / SSL issues."""
+    """Initialize and return a cached YouTube API client."""
+    global _youtube_client
+    if _youtube_client:
+        return _youtube_client
+        
     try:
-        # We create a fresh client to avoid 'httplib2' state corruption across threads 
-        # that often leads to [SSL: WRONG_VERSION_NUMBER] on Windows.
-        # Although slower than sharing a global, it fixes the SSL/Concurrent request crashes.
-        client = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY, static_discovery=False)
-        return client
+        _youtube_client = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY, static_discovery=False)
+        return _youtube_client
     except Exception as e:
         print(f"[ERROR] Failed to initialize YouTube client: {e}")
         return None
@@ -85,7 +88,7 @@ def format_duration(seconds):
     return f"{m}:{s:02d}"
 
 # ============ YOUTUBE API FUNCTIONS ============
-def fetch_youtube_videos(query="trending", max_results=10, category_name="YouTube"):
+def fetch_youtube_videos(query="trending", max_results=10, category_name="YouTube", fetch_logos=True):
     # ... (Implementation checks client) ...
     client = get_youtube_client()
     if not client:
@@ -168,9 +171,9 @@ def fetch_youtube_videos(query="trending", max_results=10, category_name="YouTub
             print(f"[!] Error fetching video details: {e}")
             return []
         
-        # 3. Batch Fetch Channel Logos
+        # 3. Batch Fetch Channel Logos (Optional for speed)
         channel_logos = {}
-        if channel_ids:
+        if fetch_logos and channel_ids:
             try:
                 ids_list = list(channel_ids)[:50] 
                 chan_req = client.channels().list(part="snippet", id=",".join(ids_list))
@@ -291,27 +294,44 @@ def search_videos(query, max_results=20):
     """
     Search for videos.
     Prioritizes FRESH results from YouTube API over local ones to ensure "new new ones".
+    Uses query caching to significantly speed up repeated searches.
     """
-    # 1. Always fetch from YouTube API for fresh content
-    new_videos = fetch_youtube_videos(query=query, max_results=max_results, category_name="Search result")
+    global _query_results_cache, _search_cache
     
-    # 2. Also look in Local Home Feed for variety/offline support
+    query_key = query.lower().strip()
+    
+    # 1. Check Query Cache (Valid for 10 minutes)
+    if query_key in _query_results_cache:
+        ts, cached_videos = _query_results_cache[query_key]
+        if (datetime.now() - ts).total_seconds() < 600: # 10 mins
+            print(f"[cache] Returning cached results for '{query}'")
+            return cached_videos[:max_results]
+
+    # 1. Always fetch from YouTube API for fresh content if not in cache
+    # Set fetch_logos=False for search to speed up the result return
+    new_videos = fetch_youtube_videos(query=query, max_results=max_results, category_name="Search result", fetch_logos=False)
+    
+    # 3. Also look in Local Home Feed for variety/offline support
     all_local = get_all_videos()
     local_results = [
         v for v in all_local 
         if query.lower() in v['title'].lower() or query.lower() in v.get('tags', '').lower()
     ]
     
-    # 3. Cache fresh results
-    global _search_cache
+    # 4. Cache fresh results in the Video Object Cache
     for v in new_videos:
         _search_cache[v['id']] = v
             
     # Combine: [Fresh API Results] + [Local Matches] (Avoiding duplicates)
     fresh_ids = {v['id'] for v in new_videos}
     combined = new_videos + [v for v in local_results if v['id'] not in fresh_ids]
+    results = combined[:max_results]
     
-    return combined[:max_results]
+    # 5. Update Query Cache
+    if results:
+        _query_results_cache[query_key] = (datetime.now(), results)
+    
+    return results
 
 def sync_youtube_to_db():
     global _youtube_videos
@@ -476,7 +496,7 @@ def get_enriched_history(user_id):
     
     return enriched
 
-def get_user_interest_queries(user_id, max_queries=3):
+def get_user_interest_queries(user_id, max_queries=5):
     """Extract potential search queries based on user's watch history."""
     history = get_enriched_history(user_id)
     if not history:
@@ -493,18 +513,36 @@ def get_user_interest_queries(user_id, max_queries=3):
             if v: liked_cats.append(v.get('category'))
     
     if liked_cats:
-        # Add a random popular category from likes
-        queries.append(random.choice(list(set(liked_cats))))
+        # Add all unique liked categories
+        queries.extend(list(set(liked_cats)))
         
     # 2. Keywords from recent titles
-    recent_titles = [v['title'] for v in history[:5]]
+    # Extract significant phrases from the last 10 videos
+    recent_titles = [v['title'] for v in history[:10]]
     for title in recent_titles:
-        # Extract a meaningful 2-word phrase or just the main word
-        words = [w for w in title.split() if len(w) > 4]
-        if words:
-            queries.append(" ".join(words[:2]))
+        # Avoid single-word generic terms. Look for capitalization or longer phrases.
+        # Simple heuristic: ignore very common broad words
+        blacklisted = {"fear", "throttle", "products", "stuff", "latest", "update", "today", "video"}
+        words = [w.strip("(),.-").lower() for w in title.split() if len(w) > 3]
+        
+        # Filter out blacklisted words and very common ones
+        meaningful_words = [w for w in words if w not in blacklisted]
+        
+        if len(meaningful_words) >= 2:
+            # Add a 2-word phrase which is much more specific than a single word
+            queries.append(" ".join(meaningful_words[:2]))
+        elif meaningful_words:
+            # Only add single words if they are quite long (likely specific)
+            if len(meaningful_words[0]) > 6:
+                queries.append(meaningful_words[0])
             
-    return list(set(queries))[:max_queries]
+    # Remove duplicates and limit
+    unique_queries = []
+    for q in queries:
+        if q and q not in unique_queries:
+            unique_queries.append(q)
+            
+    return unique_queries[:max_queries]
 
 # ============ MANUAL SYNC (for testing) ============
 

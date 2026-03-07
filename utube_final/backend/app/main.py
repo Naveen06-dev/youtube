@@ -102,11 +102,14 @@ def get_videos(q: str = None, category: str = None, user_id: str = "demo_user_12
     
     # 1. Personalization Context
     history = get_user_history(user_id)
+    from app.database.db import get_user_interest_queries
+    
     user_profile = {
         "id": user_id,
         "subscribed_channels": [cid for cid, uids in _subscriptions.items() if user_id in uids],
         "watch_history": [h['video_id'] for h in history],
-        "liked_categories": []
+        "liked_categories": [],
+        "interest_topics": get_user_interest_queries(user_id, max_queries=5)
     }
     
     # Identify liked categories from likes state
@@ -135,17 +138,7 @@ def get_videos(q: str = None, category: str = None, user_id: str = "demo_user_12
     all_videos = get_all_videos()
     
     if history:
-        # User has history: Fetch FRESH videos based on their interests
-        from app.database.db import get_user_interest_queries, fetch_youtube_videos
-        interest_topics = get_user_interest_queries(user_id)
-        
-        # Proactively fetch 5 videos for each interest topic to keep it fresh
-        for topic in interest_topics:
-            try:
-                fetch_youtube_videos(query=topic, max_results=5)
-            except: pass
-            
-        # Re-fetch all (now including new interests)
+        # User has history: Get all videos and rank them
         all_videos = get_all_videos()
         return engine.rank(all_videos, user_query="recommended", top_n=24)
     else:
@@ -179,46 +172,63 @@ def track_interaction(request: InteractionRequest):
 def recommend(video_id: str, user_id: str = "guest_user", use_deep_learning: bool = True):
     """
     Return recommended videos using Deep Learning + Hybrid logic.
+    Now strictly filtered by history interests.
     """
-    from app.database.db import get_user_history, fetch_related_videos
+    from app.database.db import get_user_history, fetch_related_videos, get_user_interest_queries
     
     video = get_video_by_id(video_id)
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
     
-    # 1. Proactively fetch related videos from YouTube if they might be missing
-    # This ensures "YouTube-like" discovery experience
+    # 1. Proactively fetch related videos
     try:
         fetch_related_videos(video_id, max_results=25)
     except Exception as e:
         print(f"[!] Could not fetch related from YT: {e}")
 
-    # Get all videos (now enriched with related ones) and user history
+    # 2. Get Context
     all_videos = get_all_videos()
     user_history = get_user_history(user_id)
     
-    # 2. Try Deep Learning Recommender first
+    # Initialize Engine for strict history filtering
+    history_ids = [h['video_id'] for h in user_history]
+    liked_cats = []
+    for vid_id, user_actions in _likes.items():
+        if user_actions.get(user_id) is True:
+            v = get_video_by_id(vid_id)
+            if v: liked_cats.append(v.get('category'))
+
+    user_profile = {
+        "id": user_id,
+        "watch_history": history_ids,
+        "liked_categories": liked_cats,
+        "interest_topics": get_user_interest_queries(user_id, max_queries=5),
+        "subscribed_channels": [cid for cid, uids in _subscriptions.items() if user_id in uids],
+    }
+    engine = SmartRankingEngine(user_profile, global_stats={"likes": _likes, "comments": _comments})
+
+    # 3. Get candidates from DL or TF-IDF
+    candidates = []
     if use_deep_learning and deep_recommender and deep_recommender.is_initialized:
         try:
-            # Re-index to include newly fetched related videos
             deep_recommender.build_video_index(all_videos)
-            
-            recommendations = deep_recommender.get_deep_recommendations(
+            candidates = deep_recommender.get_deep_recommendations(
                 current_video_id=video_id,
                 user_id=user_id,
                 videos=all_videos,
                 user_history=user_history,
-                top_n=20
+                top_n=40 # Get more for engine to filter
             )
-            if recommendations:
-                return recommendations
         except Exception as e:
-            print(f"[!] Deep Learning recommendation failed: {e}, falling back to TF-IDF")
+            print(f"[!] Deep Learning recommendation failed: {e}")
     
-    # 3. Fallback to TF-IDF recommender
-    recommender.refresh_data()
-    recommendations = recommender.get_recommendations(video_id, user_id=user_id)
-    return recommendations
+    if not candidates:
+        recommender.refresh_data()
+        candidates = recommender.get_recommendations(video_id, user_id=user_id, top_n=40)
+
+    # 4. Final STRICT filtering via the Ranking Engine
+    # This ensures only relevant (history-matching) videos stay in the list
+    return engine.rank(candidates, user_query="recommended", top_n=20)
 
 @app.get("/history/{user_id}")
 def get_history(user_id: str):
@@ -257,15 +267,28 @@ def get_suggestions(q: str = ""):
     if not q or len(q) < 2:
         return []
     
-    from app.database.db import get_all_videos
-    all_videos = get_all_videos()
+    from app.database.db import _youtube_videos
+    from app.database.data import VIDEO_DATA
     
-    # Simple prefix/containment match
-    matches = [
-        {"id": v["id"], "title": v["title"]} 
-        for v in all_videos 
-        if q.lower() in v["title"].lower()
-    ]
+    q_lower = q.lower()
+    matches = []
+    seen_ids = set()
+    
+    # 1. Search in synced videos
+    for v in _youtube_videos:
+        if q_lower in v["title"].lower():
+            matches.append({"id": v["id"], "title": v["title"]})
+            seen_ids.add(v["id"])
+            if len(matches) >= 10: break
+            
+    # 2. Search in mock data if we need more
+    if len(matches) < 10:
+        for v in VIDEO_DATA:
+            if v["id"] not in seen_ids and q_lower in v["title"].lower():
+                matches.append({"id": v["id"], "title": v["title"]})
+                seen_ids.add(v["id"])
+                if len(matches) >= 10: break
+                
     return matches[:8]
 
 @app.get("/status")
