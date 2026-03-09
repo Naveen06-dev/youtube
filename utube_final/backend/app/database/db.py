@@ -471,6 +471,34 @@ def clear_user_history(user_id):
     print(f"[clean] Cleared history for user: {user_id}")
     return True
 
+def clear_all_user_data(user_id):
+    """Full reset: Clear history, playlists, likes, and saved videos for a user."""
+    global _user_interactions, _playlists, _likes, _saved_videos, _subscriptions
+    
+    # 1. Clear History
+    clear_user_history(user_id)
+    
+    # 2. Clear Playlists
+    if user_id in _playlists:
+        _playlists[user_id] = {"Watch Later": []}
+        
+    # 3. Clear Saved Videos
+    if user_id in _saved_videos:
+        _saved_videos[user_id] = []
+        
+    # 4. Clear Likes/Dislikes
+    for vid_id in _likes:
+        if user_id in _likes[vid_id]:
+            _likes[vid_id].pop(user_id, None)
+            
+    # 5. Clear Subscriptions
+    for chan_id in _subscriptions:
+        if user_id in _subscriptions[chan_id]:
+            _subscriptions[chan_id].discard(user_id)
+            
+    print(f"[clean] Full data reset complete for user: {user_id}")
+    return True
+
 def get_enriched_history(user_id):
     """Fetch history with full video details and timestamps."""
     history = get_user_history(user_id)

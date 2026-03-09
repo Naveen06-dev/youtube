@@ -27,7 +27,7 @@ function App() {
   const activeUserId = currentUser ? currentUser.id : USER_ID;
 
   // Initial Load
-  const [view, setView] = useState('home'); // 'home', 'watch', 'history'
+  const [view, setView] = useState('home'); // 'home', 'watch', 'history', 'playlist'
   const [history, setHistory] = useState([]);
 
   const fetchHistory = () => {
@@ -220,6 +220,7 @@ function App() {
 
   // UI State
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(true);
 
   // Clear History Handler
   const clearHistory = async () => {
@@ -228,8 +229,10 @@ function App() {
       setHistory([]); // Clear local state
       setAllVideos([]); // Ensure no videos are displayed on Home
       setRecommendations([]); // Clear any recommendations
+      setUserPlaylists([]); // Clear playlists in local state
       setView('home'); // Switch to home view to show empty state
-      alert("History and Recommendations have been reset.");
+      fetchPlaylists(); // Refresh from server to get default empty state
+      alert("History, Recommendations, and Playlists have been reset.");
       setShowProfileMenu(false);
     } catch (err) {
       console.error("Failed to clear history", err);
@@ -347,6 +350,9 @@ function App() {
       {/* Navbar */}
       <nav className="navbar">
         <div className="navbar-left">
+          <div className="menu-icon" onClick={() => setShowSidebar(!showSidebar)}>
+            ☰
+          </div>
           <div className="logo" onClick={() => {
             setView('home');
             setSearchQuery("");
@@ -470,8 +476,52 @@ function App() {
       </nav>
 
       <div className="app-layout">
+        {showSidebar && (
+          <aside className="sidebar">
+            <div className="sidebar-section">
+              <div
+                className={`sidebar-item ${view === 'home' ? 'active' : ''}`}
+                onClick={() => {
+                  setView('home');
+                  setSearchQuery("");
+                  fetch(`${API_BASE}/videos?user_id=${activeUserId}`).then(r => r.json()).then(setAllVideos);
+                }}
+              >
+                🏠 Home
+              </div>
+              <div
+                className={`sidebar-item ${view === 'history' ? 'active' : ''}`}
+                onClick={() => {
+                  setView('history');
+                  fetchHistory();
+                }}
+              >
+                🕒 History
+              </div>
+            </div>
 
+            <div className="sidebar-divider"></div>
 
+            <div className="sidebar-section">
+              <h3 className="sidebar-title">Playlists</h3>
+              <div
+                className={`sidebar-item ${selectedPlaylistView === 'Watch Later' && view === 'playlist' ? 'active' : ''}`}
+                onClick={() => loadPlaylistVideos("Watch Later")}
+              >
+                🕒 Watch Later
+              </div>
+              {userPlaylists.filter(p => p.name !== "Watch Later").map(pl => (
+                <div
+                  key={pl.name}
+                  className={`sidebar-item ${selectedPlaylistView === pl.name && view === 'playlist' ? 'active' : ''}`}
+                  onClick={() => loadPlaylistVideos(pl.name)}
+                >
+                  📑 {pl.name}
+                </div>
+              ))}
+            </div>
+          </aside>
+        )}
         <main className={`main-content ${view === 'watch' ? 'watch-view-layout' : ''}`}>
           {view === 'home' ? (
             /* HOME DASHBOARD GRID */
@@ -599,6 +649,44 @@ function App() {
                   </button>
                 </div>
               )}
+            </>
+          ) : view === 'playlist' ? (
+            /* PLAYLIST VIEW */
+            <>
+              <div className="playlist-page-header" style={{ marginBottom: '2rem' }}>
+                <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>📑 {selectedPlaylistView}</h1>
+                <p style={{ color: '#aaa' }}>{allVideos.length} videos</p>
+              </div>
+              <div className="video-grid">
+                {allVideos.length > 0 ? (
+                  allVideos.map(video => (
+                    <div key={video.id} className="video-card-home" onClick={() => loadVideo(video)}>
+                      <div className="thumbnail-container" style={{ position: 'relative' }}>
+                        <img src={video.thumbnail} alt={video.title} className="video-thumb-home" />
+                        {video.duration && <div className="video-duration">{video.duration}</div>}
+                      </div>
+                      <div className="video-info-home">
+                        <img
+                          className="video-avatar"
+                          src={getChannelAvatar(video.channelTitle, video.channelThumbnail)}
+                          alt=""
+                          style={{ borderRadius: '50%', objectFit: 'cover' }}
+                        />
+                        <div className="video-text">
+                          <div className="video-title-home">{video.title}</div>
+                          <div className="video-meta-home">{video.channelTitle || 'Unknown'}</div>
+                          <div className="video-meta-home">{video.category} • 2M views</div>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="empty-state">
+                    <h3>This playlist is empty</h3>
+                    <p>Add some videos to get started!</p>
+                  </div>
+                )}
+              </div>
             </>
           ) : view === 'history' ? (
             /* HISTORY VIEW */

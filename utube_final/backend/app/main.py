@@ -238,12 +238,12 @@ def get_history(user_id: str):
 
 @app.delete("/history/{user_id}")
 def delete_history(user_id: str):
-    """Clear all watch history for a user."""
-    from app.database.db import clear_user_history, clear_synced_videos
-    clear_user_history(user_id)
+    """Clear all personal data for a user (History, Playlists, etc)."""
+    from app.database.db import clear_all_user_data, clear_synced_videos
+    clear_all_user_data(user_id)
     # Also clear the fetched videos so the feed resets completely
     clear_synced_videos()
-    return {"status": "success", "message": "History and Feed cleared"}
+    return {"status": "success", "message": "All user data and Feed cleared"}
 
 @app.get("/sync")
 def sync_data():
