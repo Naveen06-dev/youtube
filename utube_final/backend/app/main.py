@@ -92,6 +92,28 @@ def read_root():
 # ============ RANKING ENGINE ============
 # Ranking logic is now handled by SmartRankingEngine in smart_ranking.py
 
+def _get_like_dislike_counts(video_id: str):
+    """Return counts of likes and dislikes for a given video."""
+    video_likes = _likes.get(video_id, {})
+    like_count = sum(1 for v in video_likes.values() if v is True)
+    dislike_count = sum(1 for v in video_likes.values() if v is False)
+    return like_count, dislike_count
+
+
+def _enrich_videos_with_like_counts(videos):
+    """Mutate a list of video dicts to include like/dislike counts."""
+    for video in videos:
+        if not video or not isinstance(video, dict):
+            continue
+        vid_id = video.get('id')
+        if not vid_id:
+            continue
+        likes, dislikes = _get_like_dislike_counts(vid_id)
+        video['likes'] = likes
+        video['dislikes'] = dislikes
+    return videos
+
+
 @app.get("/videos")
 def get_videos(q: str = None, category: str = None, user_id: str = "demo_user_123", t: str = None):
     """
@@ -126,13 +148,13 @@ def get_videos(q: str = None, category: str = None, user_id: str = "demo_user_12
         # Fetch a larger pool of candidates (40) to allow ranking to pick the best 10
         candidates = search_videos(q, max_results=40)
         # Return smart-ranked results
-        return engine.rank(candidates, user_query=q, top_n=12)
+        return _enrich_videos_with_like_counts(engine.rank(candidates, user_query=q, top_n=12))
     
     # 3. Category Logic
     if category and category.lower() != "all":
         from app.database.db import ensure_category_content
         candidates = ensure_category_content(category)
-        return engine.rank(candidates, user_query=category, top_n=12)
+        return _enrich_videos_with_like_counts(engine.rank(candidates, user_query=category, top_n=12))
     
     # 4. Default Home Feed (Personalized & Fresh)
     all_videos = get_all_videos()
@@ -140,10 +162,10 @@ def get_videos(q: str = None, category: str = None, user_id: str = "demo_user_12
     if history:
         # User has history: Get all videos and rank them
         all_videos = get_all_videos()
-        return engine.rank(all_videos, user_query="recommended", top_n=24)
+        return _enrich_videos_with_like_counts(engine.rank(all_videos, user_query="recommended", top_n=24))
     else:
         # Cold start: rank by freshness/popularity
-        return engine.rank(all_videos, user_query="trending", top_n=20)
+        return _enrich_videos_with_like_counts(engine.rank(all_videos, user_query="trending", top_n=20))
 
 @app.get("/videos/{video_id}")
 def get_video(video_id: str):
@@ -151,7 +173,13 @@ def get_video(video_id: str):
     video = get_video_by_id(video_id)
     if not video:
         raise HTTPException(status_code=404, detail="Video not found")
-    return video
+
+    # Include current like/dislike counts in the response
+    likes, dislikes = _get_like_dislike_counts(video_id)
+    video_copy = dict(video)
+    video_copy['likes'] = likes
+    video_copy['dislikes'] = dislikes
+    return video_copy
 
 from pydantic import BaseModel
 
@@ -228,7 +256,7 @@ def recommend(video_id: str, user_id: str = "guest_user", use_deep_learning: boo
 
     # 4. Final STRICT filtering via the Ranking Engine
     # This ensures only relevant (history-matching) videos stay in the list
-    return engine.rank(candidates, user_query="recommended", top_n=20)
+    return _enrich_videos_with_like_counts(engine.rank(candidates, user_query="recommended", top_n=20))
 
 @app.get("/history/{user_id}")
 def get_history(user_id: str):
