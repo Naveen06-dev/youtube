@@ -34,32 +34,39 @@ const LoginPage = ({ onLogin }) => {
         setIsLoading(true);
         setError('');
 
-        // Simulate Auth
-        setTimeout(() => {
-            if (isLogin) {
-                // Mock validation
-                const formData = new FormData(e.target);
-                const email = formData.get('email');
-                if (email === 'error@test.com') {
-                    setError('Invalid credentials. Please try again.');
-                    setIsLoading(false);
-                } else {
-                    setSuccess(true);
-                    setTimeout(() => {
-                        onLogin({
-                            id: 'user_' + Math.random().toString(36).substr(2, 9),
-                            name: email.split('@')[0],
-                            email: email,
-                            avatar: `https://ui-avatars.com/api/?name=${email}&background=FF0000&color=fff`
-                        });
-                    }, 1500);
-                }
-            } else {
-                // Sign up simulation
+        const formData = new FormData(e.target);
+        const email = formData.get('email');
+        const password = formData.get('password');
+        const name = formData.get('fullname');
+
+        const API_BASE = 'http://localhost:8000';
+        const endpoint = isLogin ? '/login' : '/signup';
+        const payload = isLogin 
+            ? { email, password }
+            : { name, email, password };
+
+        try {
+            const response = await fetch(`${API_BASE}${endpoint}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
                 setSuccess(true);
-                setTimeout(() => setIsLogin(true), 1500);
+                setTimeout(() => {
+                    onLogin(data);
+                }, 1500);
+            } else {
+                setError(data.detail || 'Authentication failed. Please check your credentials.');
+                setIsLoading(false);
             }
-        }, 2000);
+        } catch (err) {
+            setError('Connection failed. Is the backend running?');
+            setIsLoading(false);
+        }
     };
 
     return (
@@ -110,107 +117,8 @@ const LoginPage = ({ onLogin }) => {
                 ))}
             </div>
 
-            <div className="w-full max-w-6xl flex flex-col md:flex-row gap-8 items-center z-10">
-
-                {/* Left Side: Animated Illustration / AI Visualization */}
-                <div className="hidden md:flex flex-1 flex-col items-start gap-8">
-                    <motion.div
-                        initial={{ opacity: 0, x: -50 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ duration: 0.8 }}
-                    >
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="p-3 bg-yt-red rounded-2xl shadow-[0_0_20px_rgba(255,0,0,0.5)]">
-                                <Sparkles className="text-white w-6 h-6" />
-                            </div>
-                            <h2 className="text-4xl font-bold tracking-tight">AI Powered <br />Recommendations</h2>
-                        </div>
-                        <p className="text-white/60 text-lg max-w-md">
-                            Experience the next generation of video discovery. Our neural network
-                            learns your tastes in real-time to curate the perfect feed.
-                        </p>
-                    </motion.div>
-
-                    <div className="relative w-full h-[400px]">
-                        {/* Recommendation Visualizer */}
-                        <motion.div
-                            className="absolute inset-0 flex items-center justify-center"
-                            animate={{ rotate: 360 }}
-                            transition={{ duration: 50, repeat: Infinity, ease: "linear" }}
-                        >
-                            <div className="w-[300px] h-[300px] border border-white/5 rounded-full relative">
-                                {[...Array(6)].map((_, i) => (
-                                    <motion.div
-                                        key={i}
-                                        className="absolute w-12 h-12 bg-yt-grey border border-white/10 rounded-xl flex items-center justify-center"
-                                        style={{
-                                            top: '50%',
-                                            left: '50%',
-                                            transform: `rotate(${i * 60}deg) translate(150px) rotate(-${i * 60}deg)`
-                                        }}
-                                        animate={{ scale: [1, 1.1, 1] }}
-                                        transition={{ duration: 2, repeat: Infinity, delay: i * 0.3 }}
-                                    >
-                                        <Play className="w-5 h-5 text-yt-red fill-yt-red" />
-                                    </motion.div>
-                                ))}
-                            </div>
-                        </motion.div>
-
-                        {/* Neural Hub Center */}
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <motion.div
-                                className="w-24 h-24 bg-yt-red/20 rounded-full flex items-center justify-center relative"
-                                animate={{ scale: [1, 1.15, 1] }}
-                                transition={{ duration: 3, repeat: Infinity }}
-                            >
-                                <div className="absolute inset-0 bg-yt-red rounded-full blur-2xl opacity-40 animate-pulse" />
-                                <Zap className="w-10 h-10 text-yt-red fill-yt-red relative z-10" />
-                            </motion.div>
-
-                            {/* Pulsating rings */}
-                            <motion.div
-                                className="absolute w-32 h-32 border-2 border-yt-red/30 rounded-full"
-                                animate={{ scale: [1, 1.5], opacity: [1, 0] }}
-                                transition={{ duration: 2, repeat: Infinity }}
-                            />
-                            <motion.div
-                                className="absolute w-32 h-32 border-2 border-yt-red/20 rounded-full"
-                                animate={{ scale: [1, 1.8], opacity: [1, 0] }}
-                                transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
-                            />
-                        </div>
-
-                        {/* Floating Info Cards */}
-                        <motion.div
-                            animate={{ y: [0, -10, 0] }}
-                            transition={{ duration: 10, repeat: Infinity }}
-                            className="absolute top-10 right-0 glass-card p-4 rounded-2xl flex items-center gap-3"
-                        >
-                            <TrendingUp className="text-green-500 w-5 h-5" />
-                            <div className="text-sm">
-                                <p className="font-semibold">Trend Analysis</p>
-                                <p className="text-white/40">Real-time sync...</p>
-                            </div>
-                        </motion.div>
-
-                        <motion.div
-                            animate={{ y: [0, 10, 0] }}
-                            transition={{ duration: 8, repeat: Infinity, delay: 1 }}
-                            className="absolute bottom-10 left-0 glass-card p-4 rounded-2xl flex items-center gap-3"
-                        >
-                            <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
-                                <Search className="text-blue-500 w-4 h-4" />
-                            </div>
-                            <div className="text-sm">
-                                <p className="font-semibold">Deep Search</p>
-                                <p className="text-white/40">Indexing 50k+ nodes</p>
-                            </div>
-                        </motion.div>
-                    </div>
-                </div>
-
-                {/* Right Side: Auth Form */}
+            <div className="w-full flex justify-center items-center z-10 px-4">
+                {/* Auth Form */}
                 <motion.div
                     style={{ rotateX, rotateY }}
                     className="w-full max-w-md perspective-1000"
@@ -364,30 +272,6 @@ const LoginPage = ({ onLogin }) => {
                             </button>
                         </form>
 
-                        <div className="mt-8">
-                            <div className="relative flex items-center justify-center mb-6">
-                                <div className="w-full h-px bg-white/10" />
-                                <span className="absolute px-4 bg-transparent text-xs text-white/20 uppercase tracking-widest backdrop-blur-md">Or continue with</span>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <motion.button
-                                    whileHover={{ y: -3 }}
-                                    className="flex items-center justify-center gap-2 glass-card py-3 rounded-xl hover:bg-white/10 transition-colors"
-                                >
-                                    <Chrome className="w-5 h-5 text-white" />
-                                    <span className="text-sm font-medium">Google</span>
-                                </motion.button>
-                                <motion.button
-                                    whileHover={{ y: -3 }}
-                                    className="flex items-center justify-center gap-2 glass-card py-3 rounded-xl hover:bg-white/10 transition-colors"
-                                >
-                                    <Github className="w-5 h-5 text-white" />
-                                    <span className="text-sm font-medium">GitHub</span>
-                                </motion.button>
-                            </div>
-                        </div>
-
                         <div className="mt-10 text-center">
                             <button
                                 onClick={() => setIsLogin(!isLogin)}
@@ -395,7 +279,7 @@ const LoginPage = ({ onLogin }) => {
                             >
                                 {isLogin ? "Don't have an account? " : "Already have an account? "}
                                 <span className="text-yt-red font-bold underline decoration-red-500/30 underline-offset-4">
-                                    {isLogin ? 'Sign Up' : 'Sign In'}
+                                    {isLogin ? 'Create Account' : 'Sign In'}
                                 </span>
                             </button>
                         </div>

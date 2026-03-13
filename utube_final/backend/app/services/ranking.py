@@ -117,7 +117,7 @@ class SmartRankingEngine:
         except:
             pass
 
-        return score
+        return score, has_interest_match or video_category in liked_cats or (processed_query != "recommended" and score > 0)
 
     def rank(self, candidates, user_query, top_n=10):
         """
@@ -128,7 +128,12 @@ class SmartRankingEngine:
         
         scored_vids = []
         for v in candidates:
-            final_score = self._calculate_score(v, processed_query, intent)
+            final_score, is_relevant = self._calculate_score(v, processed_query, intent)
+            
+            # STRICT FILTERING: If in recommended mode, ONLY include relevant content
+            if processed_query == "recommended" and not is_relevant:
+                continue
+                
             scored_vids.append({
                 "video": v,
                 "relevance_score": round(final_score, 2),

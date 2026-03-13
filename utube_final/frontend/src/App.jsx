@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import './App.css';
+import LoginPage from './LoginPage';
 
 
 const API_BASE = 'http://localhost:8000';
@@ -16,15 +17,10 @@ function App() {
   const [recommendations, setRecommendations] = useState([]);
   const [allVideos, setAllVideos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
-  const [currentUser, setCurrentUser] = useState({
-    id: "admin_user",
-    name: "Admin",
-    email: "admin@cntube.com",
-    avatar: "https://ui-avatars.com/api/?name=Admin&background=0D8ABC&color=fff"
-  });
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
 
-  const activeUserId = currentUser ? currentUser.id : USER_ID;
+  const activeUserId = currentUser ? String(currentUser.id) : USER_ID;
 
   // Initial Load
   const [view, setView] = useState('home'); // 'home', 'watch', 'history', 'playlist'
@@ -42,8 +38,14 @@ function App() {
 
   // Initial Load
   useEffect(() => {
+    if (!isLoggedIn || !activeUserId) {
+      setLoading(false);
+      return;
+    }
+
     const startTime = Date.now();
     const MIN_LOADING_TIME = 1000;
+    setLoading(true);
 
     fetch(`${API_BASE}/videos?t=${Date.now()}&user_id=${activeUserId}`)
       .then(res => res.json())
@@ -57,7 +59,19 @@ function App() {
         console.error("Failed to fetch videos:", err);
         setLoading(false);
       });
-  }, []);
+  }, [isLoggedIn, activeUserId]);
+
+  const handleLogin = (user) => {
+    setCurrentUser(user);
+    setIsLoggedIn(true);
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setIsLoggedIn(false);
+    setView('home');
+    setAllVideos([]);
+  };
 
   const loadVideo = async (video) => {
     setRecommendations([]); // Clear old recommendations first
@@ -337,6 +351,10 @@ function App() {
     }
   };
 
+  if (!isLoggedIn) {
+    return <LoginPage onLogin={handleLogin} />;
+  }
+
   if (loading) {
     return (
       <div className="loading-spinner">
@@ -467,7 +485,9 @@ function App() {
                 <button className="profile-item" onClick={clearHistory}>
                   🗑️ Clear History & Reset
                 </button>
-                <div className="profile-item">⚙️ Settings</div>
+                <button className="profile-item" onClick={handleLogout}>
+                  🚪 Sign Out
+                </button>
 
               </div>
             )}

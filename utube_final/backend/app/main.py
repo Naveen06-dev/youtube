@@ -17,7 +17,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from app.database.db import (
     init_db, get_all_videos, get_video_by_id, sync_youtube_to_db, 
-    _likes, _subscriptions, _comments, _saved_videos, _last_search_terms
+    _likes, _subscriptions, _comments, _saved_videos, _last_search_terms,
+    record_search_term
 )
 from app.database.users import init_user_db, create_user, authenticate_user
 from app.models.tfidf_model import Recommender
@@ -66,7 +67,7 @@ async def startup_event():
 # Enable CORS for frontend communication
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # In production, restrict this to the frontend URL
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -148,6 +149,9 @@ def get_videos(q: str = None, category: str = None, user_id: str = "demo_user_12
 
     # 2. Search Logic (with Ranking)
     if q:
+        # Record search term for personalization
+        record_search_term(user_id_str, q)
+        
         # Fetch a larger pool of candidates (40) to allow ranking to pick the best 10
         candidates = search_videos(q, max_results=40)
         # Return smart-ranked results
@@ -160,12 +164,15 @@ def get_videos(q: str = None, category: str = None, user_id: str = "demo_user_12
         return _enrich_videos_with_like_counts(engine.rank(candidates, user_query=category, top_n=12))
     
     # 4. Default Home Feed (Personalized & Fresh)
-    if not history:
-        # NEW REQUIREMENT: If No History (New ID), display nothing.
+    searches = _last_search_terms.get(user_id_str, [])
+    has_likes = any(user_actions.get(user_id_str) is True for user_actions in _likes.values())
+
+    if not history and not searches and not has_likes:
+        # NEW REQUIREMENT: If No Signals (New/Reset ID), display nothing.
         # User must search or interact first.
         return []
         
-    # User has history: Get all videos and rank them
+    # User has signals: Get all videos and rank them
     all_videos = get_all_videos()
     return _enrich_videos_with_like_counts(engine.rank(all_videos, user_query="recommended", top_n=24))
 
@@ -228,11 +235,17 @@ def recommend(video_id: str, user_id: str = "guest_user", use_deep_learning: boo
             v = get_video_by_id(vid_id)
             if v: liked_cats.append(v.get('category'))
 
+    interest_topics = get_user_interest_queries(user_id, max_queries=5)
+
+    if not history_ids and not liked_cats and not interest_topics:
+        # NO SIGNALS: Return empty list as per strict personalization requirement
+        return []
+
     user_profile = {
         "id": user_id,
         "watch_history": history_ids,
         "liked_categories": liked_cats,
-        "interest_topics": get_user_interest_queries(user_id, max_queries=5),
+        "interest_topics": interest_topics,
         "subscribed_channels": [cid for cid, uids in _subscriptions.items() if user_id in uids],
     }
     engine = SmartRankingEngine(user_profile, global_stats={"likes": _likes, "comments": _comments})
@@ -269,11 +282,9 @@ def get_history(user_id: str):
 @app.delete("/history/{user_id}")
 def delete_history(user_id: str):
     """Clear all personal data for a user (History, Playlists, etc)."""
-    from app.database.db import clear_all_user_data, clear_synced_videos
+    from app.database.db import clear_all_user_data
     clear_all_user_data(user_id)
-    # Also clear the fetched videos so the feed resets completely
-    clear_synced_videos()
-    return {"status": "success", "message": "All user data and Feed cleared"}
+    return {"status": "success", "message": "All user data cleared"}
 
 @app.get("/sync")
 def sync_data():

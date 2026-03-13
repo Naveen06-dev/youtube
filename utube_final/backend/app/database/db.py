@@ -333,6 +333,21 @@ def search_videos(query, max_results=20):
     
     return results
 
+def record_search_term(user_id, query):
+    """Record a search term for a user to use in personalization."""
+    global _last_search_terms
+    u_id = str(user_id)
+    if not query or len(query) < 3:
+        return
+    
+    if u_id not in _last_search_terms:
+        _last_search_terms[u_id] = []
+    
+    # Keep last 5 unique queries
+    if query not in _last_search_terms[u_id]:
+        _last_search_terms[u_id].insert(0, query)
+        _last_search_terms[u_id] = _last_search_terms[u_id][:5]
+
 def sync_youtube_to_db():
     global _youtube_videos
     import random
@@ -392,6 +407,7 @@ def get_all_videos():
     Excludes ephemeral search results.
     """
     from .data import VIDEO_DATA
+    # Note: _youtube_videos is global, but since we only read it, no 'global' keyword is strictly needed.
     video_map = {v['id']: v for v in _youtube_videos}
     for v in VIDEO_DATA:
         if v['id'] not in video_map:
@@ -499,6 +515,14 @@ def clear_all_user_data(user_id):
     for chan_id in _subscriptions:
         if u_id in _subscriptions[chan_id]:
             _subscriptions[chan_id].discard(u_id)
+
+    # 6. Clear Search Terms
+    if u_id in _last_search_terms:
+        _last_search_terms[u_id] = []
+
+    # 7. Clear User Comments (Remove identifying comments from the video maps)
+    for vid_id in _comments:
+        _comments[vid_id] = [c for c in _comments[vid_id] if str(c.get('user_id')) != u_id]
             
     print(f"[clean] Full data reset complete for user: {u_id}")
     return True
@@ -531,11 +555,12 @@ def get_enriched_history(user_id):
 def get_user_interest_queries(user_id, max_queries=5):
     """Extract potential search queries based on user's watch history."""
     history = get_enriched_history(user_id)
-    if not history:
-        return []
-    
     # Use most recent video titles/categories
     queries = []
+
+    # 0. Recently searched terms (High priority)
+    searches = _last_search_terms.get(user_id, [])
+    queries.extend(searches)
     
     # 1. Recently liked categories
     liked_cats = []
@@ -743,7 +768,7 @@ def get_liked_videos(user_id):
 
 def clear_liked_videos(user_id):
     """Clear all likes for a user."""
-    global _likes
+    # Note: mutating a dictionary does not require 'global'
     for vid_id in list(_likes.keys()):
         if user_id in _likes[vid_id]:
             _likes[vid_id].pop(user_id, None)
