@@ -19,6 +19,7 @@ from app.database.db import (
     init_db, get_all_videos, get_video_by_id, sync_youtube_to_db, 
     _likes, _subscriptions, _comments, _saved_videos, _last_search_terms
 )
+from app.database.users import init_user_db, create_user, authenticate_user
 from app.models.tfidf_model import Recommender
 from app.services.ranking import SmartRankingEngine
 from pydantic import BaseModel
@@ -56,6 +57,7 @@ async def startup_event():
     # Automatically sync some videos on startup so the home page isn't empty
     print("[ready] Server starting up. Triggering initial sync...")
     try:
+        init_user_db()
         sync_youtube_to_db()
     except Exception as e:
         print(f"[!] Startup sync failed: {e}")
@@ -126,17 +128,18 @@ def get_videos(q: str = None, category: str = None, user_id: str = "demo_user_12
     history = get_user_history(user_id)
     from app.database.db import get_user_interest_queries
     
+    user_id_str = str(user_id)
     user_profile = {
-        "id": user_id,
-        "subscribed_channels": [cid for cid, uids in _subscriptions.items() if user_id in uids],
+        "id": user_id_str,
+        "subscribed_channels": [cid for cid, uids in _subscriptions.items() if user_id_str in uids],
         "watch_history": [h['video_id'] for h in history],
         "liked_categories": [],
-        "interest_topics": get_user_interest_queries(user_id, max_queries=5)
+        "interest_topics": get_user_interest_queries(user_id_str, max_queries=5)
     }
     
     # Identify liked categories from likes state
     for vid_id, user_actions in _likes.items():
-        if user_actions.get(user_id) is True:
+        if user_actions.get(user_id_str) is True:
             v = get_video_by_id(vid_id)
             if v: user_profile["liked_categories"].append(v.get('category'))
 
@@ -157,15 +160,14 @@ def get_videos(q: str = None, category: str = None, user_id: str = "demo_user_12
         return _enrich_videos_with_like_counts(engine.rank(candidates, user_query=category, top_n=12))
     
     # 4. Default Home Feed (Personalized & Fresh)
+    if not history:
+        # NEW REQUIREMENT: If No History (New ID), display nothing.
+        # User must search or interact first.
+        return []
+        
+    # User has history: Get all videos and rank them
     all_videos = get_all_videos()
-    
-    if history:
-        # User has history: Get all videos and rank them
-        all_videos = get_all_videos()
-        return _enrich_videos_with_like_counts(engine.rank(all_videos, user_query="recommended", top_n=24))
-    else:
-        # Cold start: rank by freshness/popularity
-        return _enrich_videos_with_like_counts(engine.rank(all_videos, user_query="trending", top_n=20))
+    return _enrich_videos_with_like_counts(engine.rank(all_videos, user_query="recommended", top_n=24))
 
 @app.get("/videos/{video_id}")
 def get_video(video_id: str):
@@ -353,6 +355,29 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+class SignupRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+
+@app.post("/signup")
+def signup(request: SignupRequest):
+    """Create a new user account."""
+    user = create_user(request.name, request.email, request.password)
+    if not user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    return user
+
+@app.post("/login")
+def login_email(request: LoginRequest):
+    """Authenticated login with SQLite."""
+    user = authenticate_user(request.email, request.password)
+    if user:
+        user["status"] = "success"
+        return user
+    else:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+
 @app.post("/auth/google")
 def authenticate_google(request: GoogleAuthRequest):
     """Verify Google ID Token and return user info."""
@@ -390,20 +415,6 @@ def authenticate_google(request: GoogleAuthRequest):
             }
         except:
              raise HTTPException(status_code=400, detail="Auth verification failed")
-
-@app.post("/login")
-def login_email(request: LoginRequest):
-    """Simple email/password login simulator."""
-    # In production, check against hashed password in DB
-    if request.password == "password123":
-        return {
-            "id": f"user_{hash(request.email)}",
-            "email": request.email,
-            "name": request.email.split('@')[0],
-            "status": "success"
-        }
-    else:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
 
 # ============ SOCIAL FEATURES ============
 # Storage moved to db.py for consistency and persistence support
@@ -609,4 +620,17 @@ def get_playlist_content(user_id: str, playlist_name: str):
     """Get videos within a specific playlist."""
     from app.database.db import get_playlist_videos
     return get_playlist_videos(user_id, playlist_name)
+
+@app.get("/liked/{user_id}")
+def get_user_liked_videos(user_id: str):
+    """Get all videos liked by a user."""
+    from app.database.db import get_liked_videos
+    return get_liked_videos(user_id)
+
+@app.delete("/liked/{user_id}")
+def delete_user_liked_videos(user_id: str):
+    """Clear all liked videos for a user."""
+    from app.database.db import clear_liked_videos
+    clear_liked_videos(user_id)
+    return {"status": "success", "message": "Liked videos cleared"}
 

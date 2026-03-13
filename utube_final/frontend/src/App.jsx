@@ -555,7 +555,7 @@ function App() {
                         <div className="video-text">
                           <div className="video-title-home">{video.title}</div>
                           <div className="video-meta-home">{video.channelTitle || 'Unknown'}</div>
-                          <div className="video-meta-home">{video.category} • 2M views</div>
+                          <div className="video-meta-home">{video.category} • 2M views • 👍 {video.likes ?? 0}</div>
                         </div>
                       </div>
                     </div>
@@ -675,7 +675,7 @@ function App() {
                         <div className="video-text">
                           <div className="video-title-home">{video.title}</div>
                           <div className="video-meta-home">{video.channelTitle || 'Unknown'}</div>
-                          <div className="video-meta-home">{video.category} • 2M views</div>
+                          <div className="video-meta-home">{video.category} • 2M views • 👍 {video.likes ?? 0}</div>
                         </div>
                       </div>
                     </div>
@@ -964,7 +964,7 @@ function App() {
                           <div className="rec-info">
                             <div className="rec-video-title">{video.title}</div>
                             <div className="rec-category">{video.category}</div>
-                            <div className="rec-category">New</div>
+                            <div className="rec-category">👍 {video.likes ?? 0}</div>
                           </div>
                         </div>
                       ))}

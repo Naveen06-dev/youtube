@@ -442,14 +442,15 @@ def log_interaction(user_id, video_id, action_type="click"):
     global _user_interactions, _youtube_videos
     
     # 1. Log the interaction
+    u_id = str(user_id)
     interaction = {
-        "user_id": user_id,
+        "user_id": u_id,
         "video_id": video_id,
         "action": action_type,
         "timestamp": datetime.now().isoformat()
     }
     _user_interactions.append(interaction)
-    print(f"[log] Logged: {user_id} -> {action_type} -> {video_id}")
+    print(f"[log] Logged: {u_id} -> {action_type} -> {video_id}")
     
     # 2. Promotion Logic (Search/Rec -> Home Feed)
     # Check if this video is in our Search Cache but NOT in Main Pool
@@ -461,42 +462,45 @@ def log_interaction(user_id, video_id, action_type="click"):
 
 def get_user_history(user_id):
     """Fetch all interactions for a specific user."""
-    return [i for i in _user_interactions if i["user_id"] == user_id]
+    u_id = str(user_id)
+    return [i for i in _user_interactions if i["user_id"] == u_id]
 
 def clear_user_history(user_id):
     """Clear all history for a specific user."""
     global _user_interactions
+    u_id = str(user_id)
     # Keep interactions that are NOT from this user
-    _user_interactions = [i for i in _user_interactions if i["user_id"] != user_id]
-    print(f"[clean] Cleared history for user: {user_id}")
+    _user_interactions = [i for i in _user_interactions if i["user_id"] != u_id]
+    print(f"[clean] Cleared history for user: {u_id}")
     return True
 
 def clear_all_user_data(user_id):
     """Full reset: Clear history, playlists, likes, and saved videos for a user."""
     global _user_interactions, _playlists, _likes, _saved_videos, _subscriptions
+    u_id = str(user_id)
     
     # 1. Clear History
-    clear_user_history(user_id)
+    clear_user_history(u_id)
     
     # 2. Clear Playlists
-    if user_id in _playlists:
-        _playlists[user_id] = {"Watch Later": []}
+    if u_id in _playlists:
+        _playlists[u_id] = {"Watch Later": []}
         
     # 3. Clear Saved Videos
-    if user_id in _saved_videos:
-        _saved_videos[user_id] = []
+    if u_id in _saved_videos:
+        _saved_videos[u_id] = []
         
     # 4. Clear Likes/Dislikes
     for vid_id in _likes:
-        if user_id in _likes[vid_id]:
-            _likes[vid_id].pop(user_id, None)
+        if u_id in _likes[vid_id]:
+            _likes[vid_id].pop(u_id, None)
             
     # 5. Clear Subscriptions
     for chan_id in _subscriptions:
-        if user_id in _subscriptions[chan_id]:
-            _subscriptions[chan_id].discard(user_id)
+        if u_id in _subscriptions[chan_id]:
+            _subscriptions[chan_id].discard(u_id)
             
-    print(f"[clean] Full data reset complete for user: {user_id}")
+    print(f"[clean] Full data reset complete for user: {u_id}")
     return True
 
 def get_enriched_history(user_id):
@@ -726,6 +730,24 @@ def get_playlist_videos(user_id, playlist_name):
         v = get_video_by_id(vid_id)
         if v: videos.append(v)
     return videos
+
+def get_liked_videos(user_id):
+    """Get all videos liked by a user."""
+    liked_list = []
+    for vid_id, actions in _likes.items():
+        if actions.get(user_id) is True:
+            video = get_video_by_id(vid_id)
+            if video:
+                liked_list.append(video)
+    return liked_list
+
+def clear_liked_videos(user_id):
+    """Clear all likes for a user."""
+    global _likes
+    for vid_id in list(_likes.keys()):
+        if user_id in _likes[vid_id]:
+            _likes[vid_id].pop(user_id, None)
+    return True
 
 if __name__ == "__main__":
 
