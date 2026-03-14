@@ -3,7 +3,7 @@ import './App.css';
 import LoginPage from './LoginPage';
 
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
 // Simple fixed user id for personalization
 const USER_ID = "demo_user_123";
 
