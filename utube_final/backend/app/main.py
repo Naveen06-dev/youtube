@@ -645,3 +645,16 @@ def delete_user_liked_videos(user_id: str):
     clear_liked_videos(user_id)
     return {"status": "success", "message": "Liked videos cleared"}
 
+@app.get("/disliked/{user_id}")
+def get_user_disliked_videos(user_id: str):
+    """Get all videos disliked by a user."""
+    from app.database.db import get_disliked_videos
+    return get_disliked_videos(user_id)
+
+@app.delete("/disliked/{user_id}")
+def delete_user_disliked_videos(user_id: str):
+    """Clear all disliked videos for a user."""
+    from app.database.db import clear_disliked_videos
+    clear_disliked_videos(user_id)
+    return {"status": "success", "message": "Disliked videos cleared"}
+

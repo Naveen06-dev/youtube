@@ -518,6 +518,32 @@ function App() {
               >
                 🕒 History
               </div>
+              <div
+                className={`sidebar-item ${selectedPlaylistView === 'Liked Videos' && view === 'playlist' ? 'active' : ''}`}
+                onClick={() => {
+                  setSelectedPlaylistView('Liked Videos');
+                  setView('playlist');
+                  fetch(`${API_BASE}/liked/${activeUserId}`)
+                    .then(r => r.json())
+                    .then(setAllVideos)
+                    .catch(err => console.error("Failed to load liked videos", err));
+                }}
+              >
+                👍 Liked Videos
+              </div>
+              <div
+                className={`sidebar-item ${selectedPlaylistView === 'Disliked Videos' && view === 'playlist' ? 'active' : ''}`}
+                onClick={() => {
+                  setSelectedPlaylistView('Disliked Videos');
+                  setView('playlist');
+                  fetch(`${API_BASE}/disliked/${activeUserId}`)
+                    .then(r => r.json())
+                    .then(setAllVideos)
+                    .catch(err => console.error("Failed to load disliked videos", err));
+                }}
+              >
+                👎 Disliked Videos
+              </div>
             </div>
 
             <div className="sidebar-divider"></div>

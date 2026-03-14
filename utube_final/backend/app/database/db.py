@@ -766,11 +766,29 @@ def get_liked_videos(user_id):
                 liked_list.append(video)
     return liked_list
 
+def get_disliked_videos(user_id):
+    """Get all videos disliked by a user."""
+    disliked_list = []
+    for vid_id, actions in _likes.items():
+        if actions.get(user_id) is False:
+            video = get_video_by_id(vid_id)
+            if video:
+                disliked_list.append(video)
+    return disliked_list
+
 def clear_liked_videos(user_id):
     """Clear all likes for a user."""
     # Note: mutating a dictionary does not require 'global'
     for vid_id in list(_likes.keys()):
-        if user_id in _likes[vid_id]:
+        if _likes[vid_id].get(user_id) is True:
+            _likes[vid_id].pop(user_id, None)
+    return True
+
+def clear_disliked_videos(user_id):
+    """Clear all dislikes for a user."""
+    # Note: mutating a dictionary does not require 'global'
+    for vid_id in list(_likes.keys()):
+        if _likes[vid_id].get(user_id) is False:
             _likes[vid_id].pop(user_id, None)
     return True
 
