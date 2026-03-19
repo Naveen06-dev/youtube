@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import './App.css';
 import LoginPage from './LoginPage';
 
-
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:8000';
+const API_BASE = 'http://localhost:8000';
 // Simple fixed user id for personalization
 const USER_ID = "demo_user_123";
 
@@ -20,7 +19,7 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
 
-  const activeUserId = currentUser ? String(currentUser.id) : USER_ID;
+  const activeUserId = currentUser ? currentUser.id : USER_ID;
 
   // Initial Load
   const [view, setView] = useState('home'); // 'home', 'watch', 'history', 'playlist'
@@ -38,14 +37,8 @@ function App() {
 
   // Initial Load
   useEffect(() => {
-    if (!isLoggedIn || !activeUserId) {
-      setLoading(false);
-      return;
-    }
-
     const startTime = Date.now();
     const MIN_LOADING_TIME = 1000;
-    setLoading(true);
 
     fetch(`${API_BASE}/videos?t=${Date.now()}&user_id=${activeUserId}`)
       .then(res => res.json())
@@ -59,19 +52,7 @@ function App() {
         console.error("Failed to fetch videos:", err);
         setLoading(false);
       });
-  }, [isLoggedIn, activeUserId]);
-
-  const handleLogin = (user) => {
-    setCurrentUser(user);
-    setIsLoggedIn(true);
-  };
-
-  const handleLogout = () => {
-    setCurrentUser(null);
-    setIsLoggedIn(false);
-    setView('home');
-    setAllVideos([]);
-  };
+  }, []);
 
   const loadVideo = async (video) => {
     setRecommendations([]); // Clear old recommendations first
@@ -351,16 +332,37 @@ function App() {
     }
   };
 
-  if (!isLoggedIn) {
-    return <LoginPage onLogin={handleLogin} />;
-  }
-
   if (loading) {
     return (
       <div className="loading-spinner">
         <div className="loader"></div>
       </div>
     );
+  }
+
+  const handleLogin = (data) => {
+    setIsLoggedIn(true);
+    if (data && data.user) {
+      setCurrentUser(data.user);
+    } else {
+      // Fallback
+      setCurrentUser({
+        id: "admin_user",
+        name: "Admin",
+        email: "admin@cntube.com",
+        avatar: "https://ui-avatars.com/api/?name=Admin&background=0D8ABC&color=fff"
+      });
+    }
+  };
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    setCurrentUser(null);
+    setShowProfileMenu(false);
+  };
+
+  if (!isLoggedIn) {
+    return <LoginPage onLogin={handleLogin} />;
   }
 
   return (
@@ -485,10 +487,10 @@ function App() {
                 <button className="profile-item" onClick={clearHistory}>
                   🗑️ Clear History & Reset
                 </button>
-                <button className="profile-item" onClick={handleLogout}>
-                  🚪 Sign Out
+                <div className="profile-item">⚙️ Settings</div>
+                <button className="profile-item" onClick={handleLogout} style={{ color: '#ff4d4f' }}>
+                  🚪 Logout
                 </button>
-
               </div>
             )}
           </div>
@@ -517,32 +519,6 @@ function App() {
                 }}
               >
                 🕒 History
-              </div>
-              <div
-                className={`sidebar-item ${selectedPlaylistView === 'Liked Videos' && view === 'playlist' ? 'active' : ''}`}
-                onClick={() => {
-                  setSelectedPlaylistView('Liked Videos');
-                  setView('playlist');
-                  fetch(`${API_BASE}/liked/${activeUserId}`)
-                    .then(r => r.json())
-                    .then(setAllVideos)
-                    .catch(err => console.error("Failed to load liked videos", err));
-                }}
-              >
-                👍 Liked Videos
-              </div>
-              <div
-                className={`sidebar-item ${selectedPlaylistView === 'Disliked Videos' && view === 'playlist' ? 'active' : ''}`}
-                onClick={() => {
-                  setSelectedPlaylistView('Disliked Videos');
-                  setView('playlist');
-                  fetch(`${API_BASE}/disliked/${activeUserId}`)
-                    .then(r => r.json())
-                    .then(setAllVideos)
-                    .catch(err => console.error("Failed to load disliked videos", err));
-                }}
-              >
-                👎 Disliked Videos
               </div>
             </div>
 

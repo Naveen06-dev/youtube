@@ -4,15 +4,49 @@ from datetime import datetime
 from dotenv import load_dotenv
 from googleapiclient.discovery import build
 
+from googleapiclient.errors import HttpError
+
 # Load environment variables from .env file
 load_dotenv()
 
-YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
+_api_keys = []
+_current_key_idx = 0
 
-if not YOUTUBE_API_KEY:
-    print("❌ ERROR: YOUTUBE_API_KEY not found in .env file!")
-    print("Please add 'YOUTUBE_API_KEY=your_key_here' to the .env file in the backend directory.")
+def init_api_keys():
+    global _api_keys
+    keys = []
+    
+    # 1. Check comma separated keys
+    env_keys = os.getenv("YOUTUBE_API_KEY", "")
+    for k in env_keys.split(","):
+        k = k.strip()
+        if k and k not in keys: keys.append(k)
+        
+    for k, v in os.environ.items():
+        if k.startswith("YOUTUBE_API_KEY") and v.strip() and v.strip() not in keys:
+            keys.append(v.strip())
+            
+    # 2. Extract from .env directly (even commented keys)
+    try:
+        env_path = os.path.join(os.path.dirname(__file__), "..", "..", ".env")
+        if os.path.exists(env_path):
+            with open(env_path, "r") as f:
+                content = f.read()
+                import re
+                found = re.findall(r'AIza[0-9A-Za-z-_]{35}', content)
+                for k in found:
+                    if k not in keys: keys.append(k)
+    except Exception:
+        pass
+        
+    if not keys:
+        keys = [""]
+        print("❌ ERROR: YOUTUBE_API_KEY not found in .env file!")
+        
+    _api_keys = keys
+    print(f"[INFO] Loaded {len(_api_keys)} YouTube API keys. Ready for rotation.")
 
+init_api_keys()
 
 _youtube_videos = []  
 _search_cache = {}    # Stores search results temporarily (Dict[VideoID, VideoData])
@@ -29,16 +63,51 @@ _youtube_client = None
 
 def get_youtube_client():
     """Initialize and return a cached YouTube API client."""
-    global _youtube_client
+    global _youtube_client, _current_key_idx
     if _youtube_client:
         return _youtube_client
         
     try:
-        _youtube_client = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY, static_discovery=False)
+        _youtube_client = build('youtube', 'v3', developerKey=_api_keys[_current_key_idx], static_discovery=False)
         return _youtube_client
     except Exception as e:
         print(f"[ERROR] Failed to initialize YouTube client: {e}")
         return None
+
+def safe_execute(request):
+    """Executes a googleapiclient HttpRequest and rotates the API key on quota expiry."""
+    global _current_key_idx, _youtube_client
+    
+    attempts = 0
+    max_attempts = len(_api_keys)
+    
+    while attempts < max_attempts:
+        try:
+            return request.execute()
+        except HttpError as e:
+            # 403 Forbidden (Quota Exceeded) or 429 Too Many Requests
+            if e.resp.status in [403, 429]:
+                print(f"⚠️ [WARNING] API Key #{_current_key_idx} failed ({e.resp.status}). Switching to next key...")
+                # Rotate key
+                _current_key_idx = (_current_key_idx + 1) % len(_api_keys)
+                _youtube_client = None  # Force fresh client for future requests
+                
+                # Update the key in the CURRENT request URI so we can retry it immediately
+                new_key = _api_keys[_current_key_idx]
+                import urllib.parse
+                url = request.uri
+                parsed = urllib.parse.urlparse(url)
+                params = urllib.parse.parse_qs(parsed.query)
+                params['key'] = [new_key]
+                new_query = urllib.parse.urlencode(params, doseq=True)
+                request.uri = urllib.parse.urlunparse(parsed._replace(query=new_query))
+                
+                attempts += 1
+            else:
+                raise e
+    
+    print("❌ [ERROR] All available YouTube API keys exhausted or failed!")
+    return None
 
 # ============ INITIALIZATION ============
 def init_db():
@@ -105,7 +174,8 @@ def fetch_youtube_videos(query="trending", max_results=10, category_name="YouTub
             videoEmbeddable="true",
             safeSearch="moderate"
         )
-        response = request.execute()
+        response = safe_execute(request)
+        if not response: return []
         
         videos = []
         video_ids = []
@@ -126,7 +196,8 @@ def fetch_youtube_videos(query="trending", max_results=10, category_name="YouTub
                 part="snippet,contentDetails",
                 id=",".join(video_ids[:50])
             )
-            vid_res = vid_req.execute()
+            vid_res = safe_execute(vid_req)
+            if not vid_res: return []
             
             channel_ids = set()
             
@@ -177,7 +248,8 @@ def fetch_youtube_videos(query="trending", max_results=10, category_name="YouTub
             try:
                 ids_list = list(channel_ids)[:50] 
                 chan_req = client.channels().list(part="snippet", id=",".join(ids_list))
-                chan_res = chan_req.execute()
+                chan_res = safe_execute(chan_req)
+                if not chan_res: chan_res = {}
                 for ch in chan_res.get("items", []):
                     thumbs = ch["snippet"]["thumbnails"]
                     thumb_url = thumbs.get("default", {}).get("url") or thumbs.get("medium", {}).get("url")
@@ -219,7 +291,8 @@ def fetch_related_videos(video_id, max_results=10):
             type="video",
             videoEmbeddable="true"
         )
-        response = request.execute()
+        response = safe_execute(request)
+        if not response: return []
         
         # 1. Get raw search results (Video IDs)
         # We need video IDs first to fetch details (duration) for filtering
@@ -237,7 +310,8 @@ def fetch_related_videos(video_id, max_results=10):
             part="snippet,contentDetails",
             id=",".join(video_ids)
         )
-        vid_res = vid_req.execute()
+        vid_res = safe_execute(vid_req)
+        if not vid_res: return []
         
         videos = []
         for item in vid_res.get("items", []):
@@ -661,7 +735,8 @@ def fetch_channel_videos(channel_id, channel_title="Subscribed Channel", max_res
             order="date", # Get latest
             type="video"
         )
-        response = request.execute()
+        response = safe_execute(request)
+        if not response: return []
         
         # Reuse existing parsing logic if possible, or simplified version here
         # We need to fetch details for duration check (Shorts filter)
@@ -673,7 +748,8 @@ def fetch_channel_videos(channel_id, channel_title="Subscribed Channel", max_res
             part="snippet,contentDetails",
             id=",".join(video_ids)
         )
-        vid_res = vid_req.execute()
+        vid_res = safe_execute(vid_req)
+        if not vid_res: return []
         
         videos = []
         for item in vid_res.get("items", []):
