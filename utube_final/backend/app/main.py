@@ -432,6 +432,22 @@ def authenticate_google(request: GoogleAuthRequest):
         except:
              raise HTTPException(status_code=400, detail="Auth verification failed")
 
+@app.get("/admin/users")
+def get_admin_users():
+    """Admin endpoint to see all registered users."""
+    import sqlite3
+    from app.database.users import DB_PATH
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name, email, avatar FROM users")
+        users = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        return {"total_users": len(users), "users": users}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
+
 # ============ SOCIAL FEATURES ============
 # Storage moved to db.py for consistency and persistence support
 
