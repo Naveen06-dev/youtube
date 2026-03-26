@@ -19,7 +19,7 @@ function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
 
-  const activeUserId = currentUser ? currentUser.id : USER_ID;
+  const activeUserId = currentUser ? String(currentUser.id) : USER_ID;
 
   // Initial Load
   const [view, setView] = useState('home'); // 'home', 'watch', 'history', 'playlist'
@@ -37,6 +37,12 @@ function App() {
 
   // Initial Load
   useEffect(() => {
+    if (!isLoggedIn) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
     const startTime = Date.now();
     const MIN_LOADING_TIME = 1000;
 
@@ -52,7 +58,7 @@ function App() {
         console.error("Failed to fetch videos:", err);
         setLoading(false);
       });
-  }, []);
+  }, [isLoggedIn, activeUserId]);
 
   const loadVideo = async (video) => {
     setRecommendations([]); // Clear old recommendations first
@@ -178,8 +184,10 @@ function App() {
   };
 
   useEffect(() => {
-    fetchPlaylists();
-  }, []);
+    if (isLoggedIn) {
+      fetchPlaylists();
+    }
+  }, [isLoggedIn, activeUserId]);
 
   const handleAddToPlaylist = (playlistName, videoId) => {
     fetch(`${API_BASE}/playlists/add`, {
@@ -342,7 +350,9 @@ function App() {
 
   const handleLogin = (data) => {
     setIsLoggedIn(true);
-    if (data && data.user) {
+    if (data && data.email) {
+      setCurrentUser(data);
+    } else if (data && data.user) {
       setCurrentUser(data.user);
     } else {
       // Fallback

@@ -109,11 +109,54 @@ def safe_execute(request):
     print("❌ [ERROR] All available YouTube API keys exhausted or failed!")
     return None
 
-# ============ INITIALIZATION ============
+import json
+import threading
+import time
+
+DB_FILE = os.path.join(os.path.dirname(__file__), "app_data.json")
+
+def load_data():
+    global _youtube_videos, _user_interactions, _likes, _subscriptions, _comments, _saved_videos, _last_search_terms, _playlists
+    if os.path.exists(DB_FILE):
+        try:
+            with open(DB_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                _youtube_videos = data.get("youtube_videos", [])
+                _user_interactions = data.get("user_interactions", [])
+                _likes = data.get("likes", {})
+                _subscriptions = {k: set(v) for k, v in data.get("subscriptions", {}).items()}
+                _comments = data.get("comments", {})
+                _saved_videos = data.get("saved_videos", {})
+                _last_search_terms = data.get("last_search_terms", {})
+                _playlists = data.get("playlists", {})
+        except Exception as e:
+            print(f"Error loading json data: {e}")
+
+def save_data():
+    data = {
+        "youtube_videos": list(_youtube_videos),
+        "user_interactions": list(_user_interactions),
+        "likes": dict(_likes),
+        "subscriptions": {k: list(v) for k, v in dict(_subscriptions).items()},
+        "comments": dict(_comments),
+        "saved_videos": dict(_saved_videos),
+        "last_search_terms": dict(_last_search_terms),
+        "playlists": dict(_playlists)
+    }
+    try:
+        with open(DB_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f)
+    except Exception as e:
+        pass
+
+def auto_save_loop():
+    while True:
+        time.sleep(2)
+        save_data()
+
 def init_db():
-    """Initialize the database (in-memory mode)."""
-    print("[INFO] Running in IN-MEMORY mode (no external database required)")
-    print("[INFO] YouTube API is available for fetching real videos")
+    load_data()
+    threading.Thread(target=auto_save_loop, daemon=True).start()
     return True
 
 def clear_synced_videos():
