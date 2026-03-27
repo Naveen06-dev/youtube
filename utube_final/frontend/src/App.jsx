@@ -97,6 +97,40 @@ function App() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
 
+  /* VOICE SEARCH LOGIC */
+  const [isListening, setIsListening] = useState(false);
+
+  const startVoiceSearch = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Your browser doesn't support Voice Search. Please try a modern browser like Chrome or Edge.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => setIsListening(true);
+    
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setSearchQuery(transcript);
+      performSearch(transcript);
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Speech recognition error:", event.error);
+      setIsListening(false);
+    };
+
+    recognition.onend = () => setIsListening(false);
+
+    recognition.start();
+  };
+
+
   // Debounce search input to fetch suggestions
   useEffect(() => {
     // If empty, clear everything
@@ -168,6 +202,9 @@ function App() {
   const [subCount, setSubCount] = useState(0);
   const [comments, setComments] = useState([]);
   const [commentText, setCommentText] = useState('');
+
+  // Share State
+  const [showShareModal, setShowShareModal] = useState(false);
 
   // Playlist State
   const [userPlaylists, setUserPlaylists] = useState([]);
@@ -393,8 +430,8 @@ function App() {
           </div>
         </div>
 
-        <div className="search-container-wrapper">
-          <div className={`search-bar ${showSuggestions ? 'active' : ''}`}>
+        <div className="search-container-wrapper" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div className={`search-bar ${showSuggestions ? 'active' : ''}`} style={{ margin: 0 }}>
             {/* Actionable Search Icon */}
             <span
               className="search-icon-left clickable"
@@ -427,6 +464,29 @@ function App() {
               </span>
             )}
           </div>
+          
+          <button
+            className="mic-btn"
+            onClick={startVoiceSearch}
+            title={isListening ? "Listening..." : "Search with your voice"}
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '50%',
+              border: 'none',
+              background: isListening ? '#cc0000' : '#222',
+              color: '#fff',
+              fontSize: '1.2rem',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0
+            }}
+          >
+            🎙️
+          </button>
+          
 
           {/* Suggestions Dropdown */}
           {showSuggestions && suggestions.length > 0 && (
@@ -868,7 +928,7 @@ function App() {
                               👎 {dislikes > 0 ? dislikes : ''}
                             </span>
                           </div>
-                          <button className="action-btn">↗ Share</button>
+                          <button className="action-btn" onClick={() => setShowShareModal(true)}>↗ Share</button>
                           <button
                             className="action-btn"
                             onClick={() => { setVideoToSave(currentVideo); setShowPlaylistModal(true); }}
@@ -1089,6 +1149,44 @@ function App() {
               >
                 Create
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Share Modal */}
+      {showShareModal && currentVideo && (
+        <div className="modal-overlay" onClick={() => setShowShareModal(false)}>
+          <div className="playlist-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '400px' }}>
+            <div className="modal-header">
+              <h3>Share Video</h3>
+              <button className="close-btn" onClick={() => setShowShareModal(false)}>×</button>
+            </div>
+            
+            <div className="modal-footer" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '15px', padding: '15px' }}>
+              <p style={{ margin: 0, fontSize: '0.9rem', color: '#aaa' }}>Copy the link below to share.</p>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="text"
+                  readOnly
+                  value={currentVideo.videoUrl || `https://www.youtube.com/watch?v=${currentVideo.id}`}
+                  style={{ flex: 1, padding: '10px', borderRadius: '4px', border: '1px solid #444', backgroundColor: '#222', color: '#fff', fontSize: '0.9rem' }}
+                />
+                <button
+                  className="create-btn"
+                  onClick={() => {
+                    const link = currentVideo.videoUrl || `https://www.youtube.com/watch?v=${currentVideo.id}`;
+                    navigator.clipboard.writeText(link)
+                      .then(() => {
+                        alert("Link copied to clipboard!");
+                        setShowShareModal(false);
+                      })
+                      .catch(() => alert("Failed to copy."));
+                  }}
+                  style={{ padding: '0 20px', whiteSpace: 'nowrap' }}
+                >
+                  Copy
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -7,7 +7,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 # Load environment variables from .env file
-load_dotenv()
+load_dotenv(override=True)
 
 _api_keys = []
 _current_key_idx = 0
@@ -112,25 +112,55 @@ def safe_execute(request):
 import json
 import threading
 import time
+from pymongo import MongoClient
 
 DB_FILE = os.path.join(os.path.dirname(__file__), "app_data.json")
 
+def get_mongo_collection():
+    uri = os.getenv("MONGO_URI")
+    if not uri or "<db_password>" in uri:
+        return None
+    try:
+        client = MongoClient(uri)
+        db = client["Naveenutube"]
+        return db.app_data
+    except Exception as e:
+        print(f"[Mongo Error] {e}")
+        return None
+
 def load_data():
     global _youtube_videos, _user_interactions, _likes, _subscriptions, _comments, _saved_videos, _last_search_terms, _playlists
-    if os.path.exists(DB_FILE):
+    
+    data = {}
+    collection = get_mongo_collection()
+    
+    if collection is not None:
+        try:
+            doc = collection.find_one({"_id": "main_app_data"})
+            if doc:
+                data = doc
+                print("[INFO] Successfully loaded app data from MongoDB Atlas!")
+        except Exception as e:
+            print(f"[ERROR] Failed to read from MongoDB: {e}")
+            
+    # Fallback to local file if mongo fails or is not configured
+    if not data and os.path.exists(DB_FILE):
         try:
             with open(DB_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                _youtube_videos = data.get("youtube_videos", [])
-                _user_interactions = data.get("user_interactions", [])
-                _likes = data.get("likes", {})
-                _subscriptions = {k: set(v) for k, v in data.get("subscriptions", {}).items()}
-                _comments = data.get("comments", {})
-                _saved_videos = data.get("saved_videos", {})
-                _last_search_terms = data.get("last_search_terms", {})
-                _playlists = data.get("playlists", {})
+                print("[INFO] Loaded data from local JSON file.")
         except Exception as e:
             print(f"Error loading json data: {e}")
+
+    if data:
+        _youtube_videos = data.get("youtube_videos", [])
+        _user_interactions = data.get("user_interactions", [])
+        _likes = data.get("likes", {})
+        _subscriptions = {k: set(v) for k, v in data.get("subscriptions", {}).items()}
+        _comments = data.get("comments", {})
+        _saved_videos = data.get("saved_videos", {})
+        _last_search_terms = data.get("last_search_terms", {})
+        _playlists = data.get("playlists", {})
 
 def save_data():
     data = {
@@ -143,6 +173,16 @@ def save_data():
         "last_search_terms": dict(_last_search_terms),
         "playlists": dict(_playlists)
     }
+    
+    # 1. Save to MongoDB
+    collection = get_mongo_collection()
+    if collection is not None:
+        try:
+            collection.update_one({"_id": "main_app_data"}, {"$set": data}, upsert=True)
+        except Exception as e:
+            print(f"[ERROR] Failed to save to MongoDB: {e}")
+            
+    # 2. Save locally as backup
     try:
         with open(DB_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f)
@@ -151,7 +191,7 @@ def save_data():
 
 def auto_save_loop():
     while True:
-        time.sleep(2)
+        time.sleep(5)  # Increased from 2 to 5 seconds to reduce MongoDB write pressure
         save_data()
 
 def init_db():

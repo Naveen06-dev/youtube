@@ -16,3 +16,6 @@ google-api-python-client
 python-dotenv
 passlib[bcrypt]
 bcrypt
+pymongo
+pymongo[srv]
+motor

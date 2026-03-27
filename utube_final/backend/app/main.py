@@ -5,7 +5,7 @@ import sys
 import json
 
 # Load environment variables
-load_dotenv()
+load_dotenv(override=True)
 
 # Disable TensorFlow logging and oneDNN info (before imports)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3' 
@@ -435,15 +435,22 @@ def authenticate_google(request: GoogleAuthRequest):
 @app.get("/admin/users")
 def get_admin_users():
     """Admin endpoint to see all registered users."""
-    import sqlite3
-    from app.database.users import DB_PATH
+    from app.database.users import get_db
     try:
-        conn = sqlite3.connect(DB_PATH)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute("SELECT id, name, email, avatar FROM users")
-        users = [dict(row) for row in cursor.fetchall()]
-        conn.close()
+        db = get_db()
+        if db is None:
+            return {"status": "error", "detail": "Database connection failed"}
+            
+        users_collection = db.users
+        users = []
+        for user in users_collection.find({}, {"password": 0}): # Exclude parsing hashed passwords
+            users.append({
+                "id": str(user["_id"]),
+                "name": str(user.get("name", "")),
+                "email": str(user.get("email", "")),
+                "avatar": str(user.get("avatar", ""))
+            })
+            
         return {"total_users": len(users), "users": users}
     except Exception as e:
         return {"status": "error", "detail": str(e)}
