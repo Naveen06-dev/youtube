@@ -34,13 +34,13 @@ def verify_password(plain_password, hashed_password):
 def create_user(name, email, password):
     db = get_db()
     if db is None:
-        return None
+        raise Exception("Database connection failed. Please check your credentials and Atlas IP Whitelist (0.0.0.0/0).")
         
     users_collection = db.users
     
     # Check if email exists
     if users_collection.find_one({"email": email}):
-        return None  # Email already exists
+        return None  # Email actually already exists
         
     hashed_pwd = get_password_hash(password)
     avatar = f"https://ui-avatars.com/api/?name={name.replace(' ', '+')}&background=random&color=fff"

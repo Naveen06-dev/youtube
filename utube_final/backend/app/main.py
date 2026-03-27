@@ -379,10 +379,13 @@ class SignupRequest(BaseModel):
 @app.post("/signup")
 def signup(request: SignupRequest):
     """Create a new user account."""
-    user = create_user(request.name, request.email, request.password)
-    if not user:
-        raise HTTPException(status_code=400, detail="Email already registered")
-    return user
+    try:
+        user = create_user(request.name, request.email, request.password)
+        if not user:
+            raise HTTPException(status_code=400, detail="Email already registered")
+        return user
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/login")
 def login_email(request: LoginRequest):
