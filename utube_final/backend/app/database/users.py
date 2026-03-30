@@ -14,7 +14,7 @@ MONGO_URI = os.getenv("MONGO_URI")
 def get_db():
     try:
         if not MONGO_URI or "<db_password>" in MONGO_URI:
-            raise Exception("Please replace <db_password> in your .env file with your actual database password!")
+            raise Exception("MONGO_URI environment variable is missing or invalid. Set it in your .env file or hosting provider's environment settings.")
         client = MongoClient(MONGO_URI)
         return client["Naveenutube"]
     except Exception as e:
