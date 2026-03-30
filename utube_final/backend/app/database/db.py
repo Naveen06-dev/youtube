@@ -66,9 +66,13 @@ def get_youtube_client():
     global _youtube_client, _current_key_idx
     if _youtube_client:
         return _youtube_client
-        
+
     try:
-        _youtube_client = build('youtube', 'v3', developerKey=_api_keys[_current_key_idx], static_discovery=False)
+        current_key = _api_keys[_current_key_idx] if _api_keys else ""
+        if not current_key or current_key.strip() == "":
+            return None
+            
+        _youtube_client = build('youtube', 'v3', developerKey=current_key, static_discovery=False)
         return _youtube_client
     except Exception as e:
         print(f"[ERROR] Failed to initialize YouTube client: {e}")
