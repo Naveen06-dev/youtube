@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import './AuthPage.css';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'https://my-youtube-backend-0uzu.onrender.com';
+const API_BASE = import.meta.env.VITE_API_BASE || (import.meta.env.DEV ? 'http://localhost:8000' : 'https://my-youtube-backend-0uzu.onrender.com');
 
 const AuthPage = ({ onLoginSuccess }) => {
   const [isLogin, setIsLogin] = useState(true);

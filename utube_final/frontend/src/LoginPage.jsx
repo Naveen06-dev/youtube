@@ -39,7 +39,7 @@ const LoginPage = ({ onLogin }) => {
         const password = formData.get('password');
         const name = formData.get('fullname');
 
-        const API_BASE = import.meta.env.VITE_API_BASE || 'https://my-youtube-backend-0uzu.onrender.com';
+        const API_BASE = import.meta.env.VITE_API_BASE || (import.meta.env.DEV ? 'http://localhost:8000' : 'https://my-youtube-backend-0uzu.onrender.com');
         const endpoint = isLogin ? '/login' : '/signup';
         const payload = isLogin 
             ? { email, password }
