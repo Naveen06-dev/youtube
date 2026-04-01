@@ -654,8 +654,8 @@ def clear_user_history(user_id):
     return True
 
 def clear_all_user_data(user_id):
-    """Full reset: Clear history, playlists, likes, and saved videos for a user."""
-    global _user_interactions, _playlists, _likes, _saved_videos, _subscriptions
+    """Full reset: Clear user history AND completely empty the global video database cache."""
+    global _user_interactions, _playlists, _likes, _saved_videos, _subscriptions, _youtube_videos, _search_cache, _query_results_cache, _comments
     u_id = str(user_id)
     
     # 1. Clear History
@@ -686,8 +686,17 @@ def clear_all_user_data(user_id):
     # 7. Clear User Comments (Remove identifying comments from the video maps)
     for vid_id in _comments:
         _comments[vid_id] = [c for c in _comments[vid_id] if str(c.get('user_id')) != u_id]
+
+    # 8. HARD RESET: Wipe completely all cached videos from the MongoDB Database immediately
+    # This fulfills the request to reset "the database of app_data" entirely on Clear History.
+    _youtube_videos.clear()
+    _search_cache.clear()
+    _query_results_cache.clear()
             
-    print(f"[clean] Full data reset complete for user: {u_id}")
+    print(f"[clean] Full data AND GLOBAL VIDEO CACHE reset complete for user: {u_id}")
+    
+    # Force an immediate save to MongoDB Atlas so the clean slate is committed!
+    save_data()
     return True
 
 def get_enriched_history(user_id):
