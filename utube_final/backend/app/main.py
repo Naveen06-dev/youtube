@@ -255,28 +255,9 @@ def recommend(video_id: str, user_id: str = "guest_user", use_deep_learning: boo
     }
     engine = SmartRankingEngine(user_profile, global_stats={"likes": _likes, "comments": _comments})
 
-    # 3. Get candidates from DL or TF-IDF
-    candidates = []
-    if use_deep_learning and deep_recommender and deep_recommender.is_initialized:
-        try:
-            deep_recommender.build_video_index(all_videos)
-            candidates = deep_recommender.get_deep_recommendations(
-                current_video_id=video_id,
-                user_id=user_id,
-                videos=all_videos,
-                user_history=user_history,
-                top_n=40 # Get more for engine to filter
-            )
-        except Exception as e:
-            print(f"[!] Deep Learning recommendation failed: {e}")
-    
-    if not candidates:
-        recommender.refresh_data()
-        candidates = recommender.get_recommendations(video_id, user_id=user_id, top_n=40)
-
-    # 4. Final STRICT filtering via the Ranking Engine
-    # This ensures only relevant (history-matching) videos stay in the list
-    return _enrich_videos_with_like_counts(engine.rank(candidates, user_query="recommended", top_n=20))
+    # 3. Base candidates solely on history and liked categories using the Ranking Engine
+    # Ignore the current video content entirely to strictly satisfy the "only based on history/likes" requirement.
+    return _enrich_videos_with_like_counts(engine.rank(all_videos, user_query="recommended", top_n=20))
 
 @app.get("/history/{user_id}")
 def get_history(user_id: str):
