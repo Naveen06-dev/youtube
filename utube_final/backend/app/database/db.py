@@ -133,7 +133,7 @@ def get_mongo_collection():
         return None
 
 def load_data():
-    global _youtube_videos, _user_interactions, _likes, _subscriptions, _comments, _saved_videos, _last_search_terms, _playlists
+    global _youtube_videos, _user_interactions, _likes, _subscriptions, _comments, _saved_videos, _last_search_terms, _playlists, _search_cache
     
     data = {}
     collection = get_mongo_collection()
@@ -165,6 +165,7 @@ def load_data():
         _saved_videos = data.get("saved_videos", {})
         _last_search_terms = data.get("last_search_terms", {})
         _playlists = data.get("playlists", {})
+        _search_cache = data.get("search_cache", {})
 
 def save_data():
     data = {
@@ -175,7 +176,8 @@ def save_data():
         "comments": dict(_comments),
         "saved_videos": dict(_saved_videos),
         "last_search_terms": dict(_last_search_terms),
-        "playlists": dict(_playlists)
+        "playlists": dict(_playlists),
+        "search_cache": dict(_search_cache)
     }
     
     # 1. Save to MongoDB
