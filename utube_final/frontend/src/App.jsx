@@ -16,8 +16,21 @@ function App() {
   const [recommendations, setRecommendations] = useState([]);
   const [allVideos, setAllVideos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
+  const [isLoggedIn, setIsLoggedIn] = useState(() => localStorage.getItem('isLoggedIn') === 'true');
+  const [currentUser, setCurrentUser] = useState(() => {
+    const saved = localStorage.getItem('currentUser');
+    try { return saved ? JSON.parse(saved) : null; } catch { return null; }
+  });
+
+  // Sync auth state to localStorage
+  useEffect(() => {
+    localStorage.setItem('isLoggedIn', isLoggedIn);
+    if (currentUser) {
+      localStorage.setItem('currentUser', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('currentUser');
+    }
+  }, [isLoggedIn, currentUser]);
 
   const activeUserId = currentUser ? String(currentUser.id) : USER_ID;
 
