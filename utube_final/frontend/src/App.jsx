@@ -97,38 +97,7 @@ function App() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
 
-  /* VOICE SEARCH LOGIC */
-  const [isListening, setIsListening] = useState(false);
 
-  const startVoiceSearch = () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Your browser doesn't support Voice Search. Please try a modern browser like Chrome or Edge.");
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.lang = 'en-US';
-
-    recognition.onstart = () => setIsListening(true);
-    
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      setSearchQuery(transcript);
-      performSearch(transcript);
-    };
-
-    recognition.onerror = (event) => {
-      console.error("Speech recognition error:", event.error);
-      setIsListening(false);
-    };
-
-    recognition.onend = () => setIsListening(false);
-
-    recognition.start();
-  };
 
 
   // Debounce search input to fetch suggestions
@@ -465,27 +434,7 @@ function App() {
             )}
           </div>
           
-          <button
-            className="mic-btn"
-            onClick={startVoiceSearch}
-            title={isListening ? "Listening..." : "Search with your voice"}
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '50%',
-              border: 'none',
-              background: isListening ? '#cc0000' : '#222',
-              color: '#fff',
-              fontSize: '1.2rem',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexShrink: 0
-            }}
-          >
-            🎙️
-          </button>
+
           
 
           {/* Suggestions Dropdown */}
