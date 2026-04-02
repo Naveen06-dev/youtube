@@ -15,7 +15,13 @@ function App() {
   const [currentVideo, setCurrentVideo] = useState(null);
   const [recommendations, setRecommendations] = useState([]);
   const [allVideos, setAllVideos] = useState([]);
+  const [visibleCount, setVisibleCount] = useState(12);
   const [loading, setLoading] = useState(true);
+
+  // Automatically reset visible videos when switching views
+  useEffect(() => {
+    setVisibleCount(12);
+  }, [view, searchQuery]);
   const [isLoggedIn, setIsLoggedIn] = useState(() => localStorage.getItem('isLoggedIn') === 'true');
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('currentUser');
@@ -590,7 +596,7 @@ function App() {
             <>
               <div className="video-grid">
                 {allVideos.length > 0 ? (
-                  allVideos.map(video => (
+                  allVideos.slice(0, visibleCount).map(video => (
                     <div key={video.id} className="video-card-home" onClick={() => loadVideo(video)}>
                       <div className="thumbnail-container" style={{ position: 'relative' }}>
                         <img src={video.thumbnail} alt={video.title} className="video-thumb-home" />
@@ -661,9 +667,15 @@ function App() {
                   <button
                     className="load-more-btn"
                     onClick={() => {
+                      if (visibleCount < allVideos.length) {
+                        setVisibleCount(prev => prev + 12); // Show next 3 rows
+                        return;
+                      }
+
+                      // If we reached the end of the fetched videos, request more from backend
                       const btn = document.querySelector('.load-more-btn');
                       if (btn) {
-                        btn.innerText = 'Loading new videos...';
+                        btn.innerText = 'Syncing algorithms...';
                         btn.disabled = true;
                         btn.style.opacity = '0.7';
                         btn.style.cursor = 'wait';
@@ -677,6 +689,7 @@ function App() {
                         .then(res => res.json())
                         .then(data => {
                           setAllVideos(data);
+                          setVisibleCount(prev => prev + 12);
                           if (btn) {
                             btn.innerText = 'Load More Videos';
                             btn.disabled = false;
