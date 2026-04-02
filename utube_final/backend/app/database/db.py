@@ -687,13 +687,7 @@ def clear_all_user_data(user_id):
     for vid_id in _comments:
         _comments[vid_id] = [c for c in _comments[vid_id] if str(c.get('user_id')) != u_id]
 
-    # 8. HARD RESET: Wipe completely all cached videos from the MongoDB Database immediately
-    # This fulfills the request to reset "the database of app_data" entirely on Clear History.
-    _youtube_videos.clear()
-    _search_cache.clear()
-    _query_results_cache.clear()
-            
-    print(f"[clean] Full data AND GLOBAL VIDEO CACHE reset complete for user: {u_id}")
+    print(f"[clean] Full data reset complete for user: {u_id}")
     
     # Force an immediate save to MongoDB Atlas so the clean slate is committed!
     save_data()
