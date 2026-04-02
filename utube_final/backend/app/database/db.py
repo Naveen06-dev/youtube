@@ -612,6 +612,42 @@ def get_video_by_id(video_id):
         
     return video
 
+def get_strict_user_videos(user_id):
+    """
+    Returns only videos that are EXACTLY in the user's history, liked, or playlists.
+    Useful for strict recommendation requirements.
+    """
+    u_id = str(user_id)
+    strict_ids = set()
+    
+    # 1. History
+    for interaction in _user_interactions:
+        if interaction.get("user_id") == u_id:
+            strict_ids.add(interaction["video_id"])
+            
+    # 2. Liked
+    for vid_id, actions in _likes.items():
+        if actions.get(u_id) is True:
+            strict_ids.add(vid_id)
+            
+    # 3. Playlists
+    user_pl = _playlists.get(u_id, {})
+    for pl_name, videos in user_pl.items():
+        for v in videos:
+            if isinstance(v, dict) and 'id' in v:
+                strict_ids.add(v['id'])
+            elif isinstance(v, str):
+                strict_ids.add(v)
+                
+    # Rehydrate
+    result = []
+    for vid in strict_ids:
+        v_data = get_video_by_id(vid)
+        if v_data:
+            result.append(v_data)
+            
+    return result
+
 # ============ USER INTERACTIONS (IN-MEMORY) ============
 def log_interaction(user_id, video_id, action_type="click"):
     """

@@ -255,9 +255,17 @@ def recommend(video_id: str, user_id: str = "guest_user", use_deep_learning: boo
     }
     engine = SmartRankingEngine(user_profile, global_stats={"likes": _likes, "comments": _comments})
 
-    # 3. Base candidates solely on history and liked categories using the Ranking Engine
-    # Ignore the current video content entirely to strictly satisfy the "only based on history/likes" requirement.
-    return _enrich_videos_with_like_counts(engine.rank(all_videos, user_query="recommended", top_n=40))
+    # 3. STRICT FILTERING: Only recommend videos EXACTLY inside history, likes, or playlists
+    from app.database.db import get_strict_user_videos
+    candidate_videos = get_strict_user_videos(user_id)
+    
+    # If the candidate list is empty, there's nothing to recommend strictly
+    if not candidate_videos:
+        # Optionally fallback to all_videos if they wanted something, but the requirement is "only recommend".
+        return []
+        
+    # Still rank the strictly fetched videos so the best match comes first
+    return _enrich_videos_with_like_counts(engine.rank(candidate_videos, user_query="recommended", top_n=40))
 
 @app.get("/history/{user_id}")
 def get_history(user_id: str):
