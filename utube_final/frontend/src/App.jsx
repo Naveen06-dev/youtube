@@ -369,25 +369,33 @@ function App() {
 
   const handleLogin = (data) => {
     setIsLoggedIn(true);
+    localStorage.setItem('isLoggedIn', 'true');
+    let userToSet = null;
+    
     if (data && data.email) {
-      setCurrentUser(data);
+      userToSet = data;
     } else if (data && data.user) {
-      setCurrentUser(data.user);
+      userToSet = data.user;
     } else {
       // Fallback
-      setCurrentUser({
+      userToSet = {
         id: "admin_user",
         name: "Admin",
         email: "admin@cntube.com",
         avatar: "https://ui-avatars.com/api/?name=Admin&background=0D8ABC&color=fff"
-      });
+      };
     }
+    
+    setCurrentUser(userToSet);
+    localStorage.setItem('currentUser', JSON.stringify(userToSet));
   };
 
   const handleLogout = () => {
     setIsLoggedIn(false);
     setCurrentUser(null);
     setShowProfileMenu(false);
+    localStorage.removeItem('isLoggedIn');
+    localStorage.removeItem('currentUser');
   };
 
   if (!isLoggedIn) {
