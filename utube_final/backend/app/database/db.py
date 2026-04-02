@@ -714,10 +714,7 @@ def clear_all_user_data(user_id):
     for vid_id in _comments:
         _comments[vid_id] = [c for c in _comments[vid_id] if str(c.get('user_id')) != u_id]
 
-    # 8. Wipe completely all cached videos from the global database
-    _youtube_videos.clear()
-    _search_cache.clear()
-    _query_results_cache.clear()
+    # (Global database is no longer wiped for individual user clear requests)
     
     print(f"[clean] Full data reset complete for user: {u_id}")
     

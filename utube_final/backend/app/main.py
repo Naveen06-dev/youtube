@@ -189,9 +189,13 @@ def get_videos(q: str = None, category: str = None, user_id: str = "demo_user_12
         # User must search or interact first.
         return []
         
-    # User has signals: Get all videos and rank them
-    all_videos = get_all_videos()
-    return _enrich_videos_with_like_counts(engine.rank(all_videos, user_query="recommended", top_n=60))
+    # User has signals: Get ONLY videos exclusively in history/likes/playlists
+    from app.database.db import get_strict_user_videos
+    strict_videos = get_strict_user_videos(user_id)
+    if not strict_videos:
+        return []
+        
+    return _enrich_videos_with_like_counts(engine.rank(strict_videos, user_query="recommended", top_n=60))
 
 @app.get("/videos/{video_id}")
 def get_video(video_id: str):
