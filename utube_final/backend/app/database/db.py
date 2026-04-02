@@ -688,35 +688,53 @@ def clear_all_user_data(user_id):
     # 1. Clear History
     clear_user_history(u_id)
     
-    # 2. Clear Playlists
+    # 2. Clear Playlists entirely
     if u_id in _playlists:
-        _playlists[u_id] = {"Watch Later": []}
+        _playlists.pop(u_id, None)
         
-    # 3. Clear Saved Videos
+    # 3. Clear Saved Videos entirely
     if u_id in _saved_videos:
-        _saved_videos[u_id] = []
+        _saved_videos.pop(u_id, None)
         
     # 4. Clear Likes/Dislikes
+    empty_vids = []
     for vid_id in _likes:
         if u_id in _likes[vid_id]:
             _likes[vid_id].pop(u_id, None)
+            if not _likes[vid_id]:
+                empty_vids.append(vid_id)
+    for vid in empty_vids:
+        _likes.pop(vid, None)
             
     # 5. Clear Subscriptions
+    empty_chans = []
     for chan_id in _subscriptions:
         if u_id in _subscriptions[chan_id]:
             _subscriptions[chan_id].discard(u_id)
+            if not _subscriptions[chan_id]:
+                empty_chans.append(chan_id)
+    for chan in empty_chans:
+        _subscriptions.pop(chan, None)
 
-    # 6. Clear Search Terms
+    # 6. Clear Search Terms entirely
     if u_id in _last_search_terms:
-        _last_search_terms[u_id] = []
+        _last_search_terms.pop(u_id, None)
 
-    # 7. Clear User Comments (Remove identifying comments from the video maps)
+    # 7. Clear User Comments entirely (Remove identifying comments and pop if empty)
+    empty_vids_c = []
     for vid_id in _comments:
         _comments[vid_id] = [c for c in _comments[vid_id] if str(c.get('user_id')) != u_id]
+        if not _comments[vid_id]:
+            empty_vids_c.append(vid_id)
+    for vid in empty_vids_c:
+        _comments.pop(vid, None)
 
-    # (Global database is no longer wiped for individual user clear requests)
+    # 8. Wipe completely all cached videos from the global databases as explicitly requested
+    _youtube_videos.clear()
+    _search_cache.clear()
+    _query_results_cache.clear()
     
-    print(f"[clean] Full data reset complete for user: {u_id}")
+    print(f"[clean] Full AND Global data reset complete for user: {u_id}")
     
     # Force an immediate save to MongoDB Atlas so the clean slate is committed!
     save_data()
