@@ -18,10 +18,7 @@ function App() {
   const [visibleCount, setVisibleCount] = useState(12);
   const [loading, setLoading] = useState(true);
 
-  // Automatically reset visible videos when switching views
-  useEffect(() => {
-    setVisibleCount(12);
-  }, [view, searchQuery]);
+
   const [isLoggedIn, setIsLoggedIn] = useState(() => localStorage.getItem('isLoggedIn') === 'true');
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('currentUser');
@@ -115,6 +112,11 @@ function App() {
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+
+  // Automatically reset visible videos when switching views
+  useEffect(() => {
+    setVisibleCount(12);
+  }, [view, searchQuery]);
 
 
 
