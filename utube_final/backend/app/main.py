@@ -269,15 +269,9 @@ def recommend(video_id: str, user_id: str = "guest_user", use_deep_learning: boo
     }
     engine = SmartRankingEngine(user_profile, global_stats={"likes": _likes, "comments": _comments})
 
-    # 3. STRICT FILTERING: Only recommend videos EXACTLY inside history, likes, or playlists
-    from app.database.db import get_strict_user_videos
-    candidate_videos = get_strict_user_videos(user_id)
+    # 3. Rank all available videos using the Smart Engine to surface the most relevant ones to the user's current video and history.
+    candidate_videos = all_videos
     
-    # If the candidate list is empty, there's nothing to recommend strictly
-    if not candidate_videos:
-        # Optionally fallback to all_videos if they wanted something, but the requirement is "only recommend".
-        return []
-        
     # Still rank the strictly fetched videos so the best match comes first
     return _enrich_videos_with_like_counts(engine.rank(candidate_videos, user_query="recommended", top_n=40))
 
