@@ -157,16 +157,16 @@ def get_videos(q: str = None, category: str = None, user_id: str = "demo_user_12
         # Record search term for personalization
         record_search_term(user_id_str, q)
         
-        # Fetch a larger pool of candidates (40) to allow ranking to pick the best 10
-        candidates = search_videos(q, max_results=40)
+        # Fetch a larger pool of candidates (50) to allow ranking to pick the best 25
+        candidates = search_videos(q, max_results=50)
         # Return smart-ranked results
-        return _enrich_videos_with_like_counts(engine.rank(candidates, user_query=q, top_n=12))
+        return _enrich_videos_with_like_counts(engine.rank(candidates, user_query=q, top_n=25))
     
     # 3. Category Logic
     if category and category.lower() != "all":
         from app.database.db import ensure_category_content
         candidates = ensure_category_content(category)
-        return _enrich_videos_with_like_counts(engine.rank(candidates, user_query=category, top_n=12))
+        return _enrich_videos_with_like_counts(engine.rank(candidates, user_query=category, top_n=30))
     
     # 4. Default Home Feed (Personalized & Fresh)
     searches = _last_search_terms.get(user_id_str, [])
@@ -179,7 +179,7 @@ def get_videos(q: str = None, category: str = None, user_id: str = "demo_user_12
         
     # User has signals: Get all videos and rank them
     all_videos = get_all_videos()
-    return _enrich_videos_with_like_counts(engine.rank(all_videos, user_query="recommended", top_n=24))
+    return _enrich_videos_with_like_counts(engine.rank(all_videos, user_query="recommended", top_n=60))
 
 @app.get("/videos/{video_id}")
 def get_video(video_id: str):
@@ -257,7 +257,7 @@ def recommend(video_id: str, user_id: str = "guest_user", use_deep_learning: boo
 
     # 3. Base candidates solely on history and liked categories using the Ranking Engine
     # Ignore the current video content entirely to strictly satisfy the "only based on history/likes" requirement.
-    return _enrich_videos_with_like_counts(engine.rank(all_videos, user_query="recommended", top_n=20))
+    return _enrich_videos_with_like_counts(engine.rank(all_videos, user_query="recommended", top_n=40))
 
 @app.get("/history/{user_id}")
 def get_history(user_id: str):
