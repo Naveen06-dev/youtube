@@ -65,15 +65,11 @@ async def startup_event():
     print("[ready] Startup complete. Ready for requests.")
 
 # Enable CORS for frontend communication
+# Set allow_origins to ["*"] and credentials to False so Vercel preview domains don't break.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173", 
-        "http://127.0.0.1:5173",
-        "https://youtube-eosin-tau.vercel.app",
-        "https://realtime-ntube.vercel.app"
-    ],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
