@@ -97,6 +97,18 @@ print(f"Server initialized. Model trained on {len(recommender.df)} videos.")
 def read_root():
     return {"message": "YouTube Recommender API is running"}
 
+@app.get("/sync")
+def sync():
+    """Force sync with YouTube API based on user interests."""
+    from app.database.db import sync_youtube_to_db
+    try:
+        res = sync_youtube_to_db()
+        return res
+    except Exception as e:
+        if "QUOTA_EXCEEDED" in str(e):
+            raise HTTPException(status_code=429, detail="YouTube API Quota Exceeded. Please review Quotas.")
+        raise HTTPException(status_code=500, detail=str(e))
+
 # ============ RANKING ENGINE ============
 # Ranking logic is now handled by SmartRankingEngine in smart_ranking.py
 

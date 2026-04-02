@@ -111,7 +111,7 @@ def safe_execute(request):
                 raise e
     
     print("❌ [ERROR] All available YouTube API keys exhausted or failed!")
-    return None
+    raise RuntimeError("QUOTA_EXCEEDED")
 
 import json
 import threading
@@ -355,6 +355,8 @@ def fetch_youtube_videos(query="trending", max_results=10, category_name="YouTub
         
     except Exception as e:
         print(f"[ERROR] Error fetching from YouTube: {e}")
+        if "QUOTA_EXCEEDED" in str(e):
+            raise e
         return []
 
 def fetch_related_videos(video_id, max_results=10):
@@ -569,12 +571,7 @@ def get_all_videos():
     ONLY returns videos explicitly tracked in the main pool.
     Excludes ephemeral search results.
     """
-    from .data import VIDEO_DATA
-    # Note: _youtube_videos is global, but since we only read it, no 'global' keyword is strictly needed.
     video_map = {v['id']: v for v in _youtube_videos}
-    for v in VIDEO_DATA:
-        if v['id'] not in video_map:
-            video_map[v['id']] = v
     
     # Safety Check: Ensure every video has an embed URL
     for vid, data in video_map.items():
@@ -586,7 +583,7 @@ def get_all_videos():
 def get_video_by_id(video_id):
     """
     Get a specific video by its ID.
-    Checks: Main Pool -> Search Cache -> Mock Data
+    Checks: Main Pool -> Search Cache
     """
     video = None
     
@@ -599,15 +596,9 @@ def get_video_by_id(video_id):
     # 2. Search Cache
     if not video and video_id in _search_cache:
         video = _search_cache[video_id]
-
-    # 3. Mock Data
-    if not video:
-        from .data import VIDEO_DATA
-        video = next((v for v in VIDEO_DATA if v["id"] == video_id), None)
-    
+        
     if video and 'videoUrl' not in video:
-        # Compatibility fix: ensure videoUrl is present
-        video = video.copy() # Don't mutate if it's from VIDEO_DATA
+        video = video.copy() 
         video['videoUrl'] = f"https://www.youtube.com/embed/{video_id}"
         
     return video

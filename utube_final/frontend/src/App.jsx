@@ -684,7 +684,14 @@ function App() {
                       }
 
                       fetch(`${API_BASE}/sync`)
-                        .then(res => res.json())
+                        .then(async res => {
+                          if (res.status === 429) {
+                            console.error("⚠️ TOKEN LIMIT EXCEEDED: All YouTube API keys have exhausted their daily quota!");
+                            alert("API Quota Limit Reached. Cannot sync new videos right now.");
+                            throw new Error("QUOTA_EXCEEDED");
+                          }
+                          return res.json();
+                        })
                         .then(() => {
                           return fetch(`${API_BASE}/videos?user_id=${activeUserId}`);
                         })
@@ -702,7 +709,7 @@ function App() {
                         .catch(err => {
                           console.error('Failed to load more', err);
                           if (btn) {
-                            btn.innerText = 'Try Again';
+                            btn.innerText = 'Try Again (Quota Exceeded?)';
                             btn.disabled = false;
                             btn.style.opacity = '1';
                           }
