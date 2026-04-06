@@ -92,6 +92,7 @@ function App() {
           action: "click"
         })
       });
+      fetchPlaylists(); // Refresh to show updated Watch Later count
     } catch (e) {
       console.warn("Analytics failed", e);
     }

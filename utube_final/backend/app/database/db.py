@@ -658,6 +658,9 @@ def log_interaction(user_id, video_id, action_type="click"):
     _user_interactions.append(interaction)
     print(f"[log] Logged: {u_id} -> {action_type} -> {video_id}")
     
+    # History is also stored in Watch Later
+    add_to_playlist(u_id, "Watch Later", video_id)
+    
     # 2. Promotion Logic (Search/Rec -> Home Feed)
     # Check if this video is in our Search Cache but NOT in Main Pool
     existing_ids = {v['id'] for v in _youtube_videos}
