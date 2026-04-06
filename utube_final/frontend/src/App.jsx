@@ -185,9 +185,6 @@ function App() {
 
 
   // ============ SOCIAL FEATURES STATE ============
-  const [likes, setLikes] = useState(0);
-  const [dislikes, setDislikes] = useState(0);
-  const [userLikeAction, setUserLikeAction] = useState(null); // 'like', 'dislike', or null
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [subCount, setSubCount] = useState(0);
   const [comments, setComments] = useState([]);
@@ -272,16 +269,6 @@ function App() {
   // Fetch social data when video changes
   useEffect(() => {
     if (currentVideo) {
-      // Fetch likes
-      fetch(`${API_BASE}/likes/${currentVideo.id}?user_id=${activeUserId}`)
-        .then(res => res.json())
-        .then(data => {
-          setLikes(data.likes);
-          setDislikes(data.dislikes);
-          setUserLikeAction(data.user_action);
-        })
-        .catch(console.error);
-
       // Fetch subscription status
       const channelId = currentVideo.channelTitle || currentVideo.id;
       fetch(`${API_BASE}/subscribed/${channelId}?user_id=${activeUserId}`)
@@ -301,27 +288,6 @@ function App() {
 
     }
   }, [currentVideo]);
-
-  // Like/Dislike Handler
-  const handleLike = async (isLike) => {
-    try {
-      const res = await fetch(`${API_BASE}/like`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: activeUserId,
-          video_id: currentVideo.id,
-          is_like: isLike
-        })
-      });
-      const data = await res.json();
-      setLikes(data.likes);
-      setDislikes(data.dislikes);
-      setUserLikeAction(data.user_action);
-    } catch (err) {
-      console.error("Like failed:", err);
-    }
-  };
 
   // Subscribe Handler
   const handleSubscribe = async () => {
@@ -625,7 +591,7 @@ function App() {
                         <div className="video-text">
                           <div className="video-title-home">{video.title}</div>
                           <div className="video-meta-home">{video.channelTitle || 'Unknown'}</div>
-                          <div className="video-meta-home">{video.category} • 2M views • 👍 {video.likes ?? 0}</div>
+                          <div className="video-meta-home">{video.category} • 2M views</div>
                         </div>
                       </div>
                     </div>
@@ -759,7 +725,7 @@ function App() {
                         <div className="video-text">
                           <div className="video-title-home">{video.title}</div>
                           <div className="video-meta-home">{video.channelTitle || 'Unknown'}</div>
-                          <div className="video-meta-home">{video.category} • 2M views • 👍 {video.likes ?? 0}</div>
+                          <div className="video-meta-home">{video.category} • 2M views</div>
                         </div>
                       </div>
                     </div>
@@ -893,33 +859,6 @@ function App() {
                         </div>
 
                         <div className="video-actions">
-                          <div className="action-pill">
-                            <span
-                              className={`like-btn ${userLikeAction === 'like' ? 'active' : ''
-                                }`}
-                              onClick={() => handleLike(true)}
-                              style={
-                                userLikeAction === 'like'
-                                  ? { background: '#065fd4', color: '#fff' }
-                                  : {}
-                              }
-                            >
-                              👍 {likes > 0 ? likes : ''}
-                            </span>
-                            <div className="vert-divider"></div>
-                            <span
-                              className={`dislike-btn ${userLikeAction === 'dislike' ? 'active' : ''
-                                }`}
-                              onClick={() => handleLike(false)}
-                              style={
-                                userLikeAction === 'dislike'
-                                  ? { background: '#333', color: '#fff' }
-                                  : {}
-                              }
-                            >
-                              👎 {dislikes > 0 ? dislikes : ''}
-                            </span>
-                          </div>
                           <button className="action-btn" onClick={() => setShowShareModal(true)}>↗ Share</button>
                           <button
                             className="action-btn"
@@ -1048,7 +987,6 @@ function App() {
                           <div className="rec-info">
                             <div className="rec-video-title">{video.title}</div>
                             <div className="rec-category">{video.category}</div>
-                            <div className="rec-category">👍 {video.likes ?? 0}</div>
                           </div>
                         </div>
                       ))}

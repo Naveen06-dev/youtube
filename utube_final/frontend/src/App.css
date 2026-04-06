@@ -441,36 +441,6 @@
   gap: 8px;
 }
 
-.action-pill {
-  display: flex;
-  align-items: center;
-  background: #222;
-  border-radius: 18px;
-  height: 36px;
-  overflow: hidden;
-}
-
-.like-btn,
-.dislike-btn {
-  padding: 0 16px;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  font-weight: 500;
-  font-size: 0.9rem;
-}
-
-.like-btn:hover,
-.dislike-btn:hover {
-  background: #333;
-}
-
-.vert-divider {
-  width: 1px;
-  height: 20px;
-  background: #444;
-}
 
 .action-btn,
 .action-circle {
