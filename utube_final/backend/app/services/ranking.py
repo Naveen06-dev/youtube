@@ -96,6 +96,17 @@ class SmartRankingEngine:
         if video.get("channelId") in subs or video.get("channelTitle") in subs:
             score += 400
             
+        # History Driven Boost
+        history_channels = [c.lower() for c in self.user_profile.get("history_channels", [])]
+        if channel_title in history_channels:
+            score += 1200 # Boost videos from recently watched channels
+            has_interest_match = True
+            
+        history_categories = [c.lower() for c in self.user_profile.get("history_categories", [])]
+        if video_category in history_categories:
+            score += 800 # Boost videos from recently watched categories
+            has_interest_match = True
+
         # Watch history penalty (reduce already watched)
         history = self.user_profile.get("watch_history", [])
         if video.get("id") in history:

@@ -143,10 +143,24 @@ def get_videos(q: str = None, category: str = None, user_id: str = "demo_user_12
     from app.database.db import get_user_interest_queries
     
     user_id_str = str(user_id)
+    history_channels = []
+    history_categories = []
+    for h in history:
+        v = get_video_by_id(h['video_id'])
+        if v:
+            channel = v.get("channelTitle")
+            if channel and channel not in history_channels:
+                history_channels.append(channel)
+            cat = v.get("category")
+            if cat and cat not in history_categories:
+                history_categories.append(cat)
+                
     user_profile = {
         "id": user_id_str,
         "subscribed_channels": [cid for cid, uids in _subscriptions.items() if user_id_str in uids],
         "watch_history": [h['video_id'] for h in history],
+        "history_channels": history_channels[:10],
+        "history_categories": history_categories,
         "liked_categories": [],
         "interest_topics": get_user_interest_queries(user_id_str, max_queries=5)
     }
@@ -243,7 +257,21 @@ def recommend(video_id: str, user_id: str = "guest_user", use_deep_learning: boo
     user_history = get_user_history(user_id)
     
     # Initialize Engine for strict history filtering
-    history_ids = [h['video_id'] for h in user_history]
+    history_ids = []
+    history_channels = []
+    history_categories = []
+    for h in user_history:
+        vid_id = h['video_id']
+        history_ids.append(vid_id)
+        v = get_video_by_id(vid_id)
+        if v:
+            channel = v.get("channelTitle")
+            if channel and channel not in history_channels:
+                history_channels.append(channel)
+            cat = v.get("category")
+            if cat and cat not in history_categories:
+                history_categories.append(cat)
+                
     liked_cats = []
     for vid_id, user_actions in _likes.items():
         if user_actions.get(user_id) is True:
@@ -259,6 +287,8 @@ def recommend(video_id: str, user_id: str = "guest_user", use_deep_learning: boo
     user_profile = {
         "id": user_id,
         "watch_history": history_ids,
+        "history_channels": history_channels[:10],
+        "history_categories": history_categories,
         "liked_categories": liked_cats,
         "interest_topics": interest_topics,
         "subscribed_channels": [cid for cid, uids in _subscriptions.items() if user_id in uids],

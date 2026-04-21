@@ -1,4 +1,0 @@
-You tube recommendation cmd
-frontend : npm i
-           npm run dev
-backend : uvicorn main:app --reload --host 0.0.0.0 --port 8000
